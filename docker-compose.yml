@@ -3,7 +3,6 @@ version: '3.8'
 services:
 
 ### NETOWRK SERVICES
-
   traefik:
     image: traefik:v2.5
     container_name: traefik
@@ -46,10 +45,11 @@ services:
 
     networks:
       - my-network
-      
   gluetun:
     image: qmcgaw/gluetun:latest
     container_name: gluetun
+    devices:
+      - /dev/net/tun:/dev/net/tun
     environment:
       - VPNSP=${VPNSP}
       - OPENVPN_USER=${OPENVPN_USER}
@@ -60,10 +60,29 @@ services:
       - NET_ADMIN
     networks:
       - my-network
+    ports:
+      - 8080:8080  #SABnzbd
+      - 8090:8090  #qBittorrent
+    labels:
+      - traefik.enable=true
+
+      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.dev.carr-it.net`)
+      - traefik.http.routers.sabnzbd.service=sabnzbd
+      - traefik.http.routers.sabnzbd.entrypoints=websecure
+      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver
+      - traefik.http.services.sabnzbd.loadbalancer.server.port=8080
+
+      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.dev.carr-it.net`)
+      - traefik.http.routers.qbittorrent.service=qbittorrent
+      - traefik.http.routers.qbittorrent.entrypoints=websecure
+      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
+      - traefik.http.services.qbittorrent.loadbalancer.server.port=8090
+
     restart: unless-stopped
+    volumes:
+      - ./config/gluetun:/gluetun
 
 ### DOWNLOAD CLIENTS
-
   sabnzbd:
     image: ghcr.io/linuxserver/sabnzbd
     container_name: sabnzbd
@@ -71,16 +90,11 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
+      - SABNZDB_HOST=0.0.0.0
     volumes:
       - ./config/sabnzbd:/config
       - ./media:/media
-    networks:
-      - my-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.dev.carr-it.net`)
-      - traefik.http.routers.sabnzbd.entrypoints=websecure
-      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver
+    network_mode: "service:gluetun"
 
   qbittorrent:
     image: ghcr.io/linuxserver/qbittorrent
@@ -93,21 +107,9 @@ services:
     volumes:
       - ./config/qbittorrent:/config
       - ./media:/media
-    ports:
-      - 8090:8090
-      - 6881:6881
-      - 6881:6881/udp
-    networks:
-      - my-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.dev.carr-it.net`)
-      - traefik.http.routers.qbittorrent.entrypoints=websecure
-      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
-      - traefik.http.services.qbittorrent.loadbalancer.server.port=8090
+    network_mode: "service:gluetun"
 
 ### MEDIA MANAGERS
-
   radarr:
     image: ghcr.io/linuxserver/radarr
     container_name: radarr
@@ -125,7 +127,6 @@ services:
       - traefik.http.routers.radarr.rule=Host(`radarr.dev.carr-it.net`)
       - traefik.http.routers.radarr.entrypoints=websecure
       - traefik.http.routers.radarr.tls.certresolver=myresolver
-
   sonarr:
     image: ghcr.io/linuxserver/sonarr
     container_name: sonarr
@@ -143,7 +144,6 @@ services:
       - traefik.http.routers.sonarr.rule=Host(`sonarr.dev.carr-it.net`)
       - traefik.http.routers.sonarr.entrypoints=websecure
       - traefik.http.routers.sonarr.tls.certresolver=myresolver  
-
   lidarr:
     image: ghcr.io/linuxserver/lidarr
     container_name: lidarr
@@ -164,7 +164,6 @@ services:
 
 
 ### WEB FRONTENDS
-
   heimdall:
     image: ghcr.io/linuxserver/heimdall
     container_name: heimdall
