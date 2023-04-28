@@ -45,6 +45,20 @@ services:
 
     networks:
       - my-network
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    environment:
+      - VPNSP=${VPNSP}
+      - OPENVPN_USER=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - REGION=${VPN_REGION}
+      - TZ=${TZ}
+    cap_add:
+      - NET_ADMIN
+    networks:
+      - my-network
+    restart: unless-stopped
 
   heimdall:
     image: ghcr.io/linuxserver/heimdall
