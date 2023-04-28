@@ -20,12 +20,10 @@ services:
       - "--certificatesResolvers.myresolver.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53"
       # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
       - "--api.dashboard=true"
-      # - "--api.insecure=true" # Use this only for testing purposes or secure it with proper authentication
 
     ports:
       - "80:80"
       - "443:443"
-      # - "8080:8080" # Add this line to expose the Traefik dashboard
 
     environment:
       - "CF_API_EMAIL=${CF_API_EMAIL}"
@@ -84,6 +82,29 @@ services:
       - traefik.http.routers.sabnzbd.entrypoints=websecure
       - traefik.http.routers.sabnzbd.tls.certresolver=myresolver
 
+  qbittorrent:
+    image: ghcr.io/linuxserver/qbittorrent
+    container_name: qbittorrent
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=8090
+    volumes:
+      - ./config/qbittorrent:/config
+      - ./media:/media
+    ports:
+      - 8090:8090
+      - 6881:6881
+      - 6881:6881/udp
+    networks:
+      - my-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.dev.carr-it.net`)
+      - traefik.http.routers.qbittorrent.entrypoints=websecure
+      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
+      - traefik.http.services.qbittorrent.loadbalancer.server.port=8090
 
 ### MEDIA MANAGERS
 
