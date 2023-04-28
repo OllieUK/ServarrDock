@@ -110,6 +110,26 @@ services:
     network_mode: "service:gluetun"
 
 ### MEDIA MANAGERS
+  prowlarr:
+    image: ghcr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ./config/prowlarr:/config
+      - ./media:/media
+    networks:
+      - my-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.dev.carr-it.net`)
+      - traefik.http.routers.prowlarr.entrypoints=websecure
+      - traefik.http.routers.prowlarr.tls.certresolver=myresolver
+      - traefik.http.services.prowlarr.loadbalancer.server.port=9696
+    restart: unless-stopped
+
   radarr:
     image: ghcr.io/linuxserver/radarr
     container_name: radarr
