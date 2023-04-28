@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+
+### NETOWRK SERVICES
+
   traefik:
     image: traefik:v2.5
     container_name: traefik
@@ -60,22 +63,28 @@ services:
       - my-network
     restart: unless-stopped
 
-  heimdall:
-    image: ghcr.io/linuxserver/heimdall
-    container_name: heimdall
+### DOWNLOAD CLIENTS
+
+  sabnzbd:
+    image: ghcr.io/linuxserver/sabnzbd
+    container_name: sabnzbd
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
     volumes:
-      - ./config/heimdall:/config
+      - ./config/sabnzbd:/config
+      - ./media:/media
     networks:
       - my-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.heimdall.rule=Host(`heimdall.dev.carr-it.net`)
-      - traefik.http.routers.heimdall.entrypoints=websecure
-      - traefik.http.routers.heimdall.tls.certresolver=myresolver
+      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.dev.carr-it.net`)
+      - traefik.http.routers.sabnzbd.entrypoints=websecure
+      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver
+
+
+### MEDIA MANAGERS
 
   radarr:
     image: ghcr.io/linuxserver/radarr
@@ -130,6 +139,26 @@ services:
       - traefik.http.routers.lidarr.rule=Host(`lidarr.dev.carr-it.net`)
       - traefik.http.routers.lidarr.entrypoints=websecure
       - traefik.http.routers.lidarr.tls.certresolver=myresolver
+
+
+### WEB FRONTENDS
+
+  heimdall:
+    image: ghcr.io/linuxserver/heimdall
+    container_name: heimdall
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ./config/heimdall:/config
+    networks:
+      - my-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.heimdall.rule=Host(`heimdall.dev.carr-it.net`)
+      - traefik.http.routers.heimdall.entrypoints=websecure
+      - traefik.http.routers.heimdall.tls.certresolver=myresolver
 
 
   # Add your other services here
