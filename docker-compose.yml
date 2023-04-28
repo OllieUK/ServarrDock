@@ -48,6 +48,7 @@ services:
 
     networks:
       - my-network
+      
   gluetun:
     image: qmcgaw/gluetun:latest
     container_name: gluetun
