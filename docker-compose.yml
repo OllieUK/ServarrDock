@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v2.5
+    container_name: traefik
+    command:
+      - "--log.level=DEBUG"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.myresolver.acme.email=${CF_API_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/acme.json"
+      - "--certificatesResolvers.myresolver.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53"
+      # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--api.dashboard=true"
+      # - "--api.insecure=true" # Use this only for testing purposes or secure it with proper authentication
+
+    ports:
+      - "80:80"
+      - "443:443"
+      # - "8080:8080" # Add this line to expose the Traefik dashboard
+
+    environment:
+      - "CF_API_EMAIL=${CF_API_EMAIL}"
+      - "CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}"
+
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.traefik.rule=Host(`traefik.dev.carr-it.net`)"
+    - "traefik.http.routers.traefik.entrypoints=websecure"
+    - "traefik.http.routers.traefik.tls.certresolver=myresolver"
+    - "traefik.http.routers.traefik.service=api@internal"
+    - "traefik.http.routers.traefik.tls=true"
+    - "traefik.http.routers.traefik.tls.domains[0].main=dev.carr-it.net"
+    - "traefik.http.routers.traefik.tls.domains[0].sans=*.dev.carr-it.net"
+
+
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./config/traefik/acme.json:/acme.json"
+
+    networks:
+      - my-network
+
+  heimdall:
+    image: ghcr.io/linuxserver/heimdall
+    container_name: heimdall
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ./config/heimdall:/config
+    networks:
+      - my-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.heimdall.rule=Host(`heimdall.dev.carr-it.net`)
+      - traefik.http.routers.heimdall.entrypoints=websecure
+      - traefik.http.routers.heimdall.tls.certresolver=myresolver
+
+  radarr:
+    image: ghcr.io/linuxserver/radarr
+    container_name: radarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ./config/radarr:/config
+      - ./media:/media
+    networks:
+      - my-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.radarr.rule=Host(`radarr.dev.carr-it.net`)
+      - traefik.http.routers.radarr.entrypoints=websecure
+      - traefik.http.routers.radarr.tls.certresolver=myresolver
+
+  sonarr:
+    image: ghcr.io/linuxserver/sonarr
+    container_name: sonarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ./config/sonarr:/config
+      - ./media:/media
+    networks:
+      - my-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.dev.carr-it.net`)
+      - traefik.http.routers.sonarr.entrypoints=websecure
+      - traefik.http.routers.sonarr.tls.certresolver=myresolver  
+
+  lidarr:
+    image: ghcr.io/linuxserver/lidarr
+    container_name: lidarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ./config/lidarr:/config
+      - ./media:/media
+    networks:
+      - my-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.lidarr.rule=Host(`lidarr.dev.carr-it.net`)
+      - traefik.http.routers.lidarr.entrypoints=websecure
+      - traefik.http.routers.lidarr.tls.certresolver=myresolver
+
+
+  # Add your other services here
+  # service1:
+  # ...
+
+networks:
+  my-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
