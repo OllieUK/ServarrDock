@@ -205,12 +205,6 @@ services:
       - traefik.http.routers.heimdall.rule=Host(`heimdall.${DOMAIN}`) # Define the routing rule for Heimdall based on the domain
       - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
-
-
-  # Add your other services here
-  # service1:
-  # ...
-
 networks:
   my-network: # Name of the custom network
     driver: bridge # Use the bridge network driver, which connects containers on the same host
