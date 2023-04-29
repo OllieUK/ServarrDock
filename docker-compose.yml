@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
 
+  ### UPDATING CONTAINERS
   watchtower:
     image: containrrr/watchtower
     container_name: watchtower
@@ -13,8 +14,8 @@ services:
       - WATCHTOWER_CLEANUP=true # Remove old images after updating
       - WATCHTOWER_POLL_INTERVAL=86400 # Check for updates every 24 hours (in seconds)
 
-### NETOWRK SERVICES
-  traefik:
+  ### NETWORK SERVICES
+  traefik:  # Automatically monitors and updates running Docker containers when a new image is available.
     image: traefik:v2.5
     container_name: traefik
     command:
@@ -56,7 +57,7 @@ services:
 
     networks:
       - my-network
-  gluetun:
+  gluetun:  # A VPN client container that supports multiple VPN providers, allowing your other containers to route their traffic through a secure VPN tunnel.
     image: qmcgaw/gluetun:latest
     container_name: gluetun
     devices:
@@ -94,7 +95,7 @@ services:
       - ./config/gluetun:/gluetun
 
 ### DOWNLOAD CLIENTS
-  sabnzbd:
+  sabnzbd:  # A Usenet binary newsreader that automates the process of downloading and decoding binary files from Usenet newsgroups.
     image: ghcr.io/linuxserver/sabnzbd
     container_name: sabnzbd
     environment:
@@ -106,8 +107,7 @@ services:
       - ./config/sabnzbd:/config
       - ./media:/media
     network_mode: "service:gluetun"
-
-  qbittorrent:
+  qbittorrent:  # A lightweight and feature-rich BitTorrent client that enables you to download torrents and manage your torrent files.
     image: ghcr.io/linuxserver/qbittorrent
     container_name: qbittorrent
     environment:
@@ -121,7 +121,7 @@ services:
     network_mode: "service:gluetun"
 
 ### MEDIA MANAGERS
-  prowlarr:
+  prowlarr: # A meta-indexer and search aggregator for Usenet and torrent indexers, simplifying the integration between indexers and media managers like Sonarr, Radarr, and Lidarr.
     image: ghcr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
     environment:
@@ -140,8 +140,7 @@ services:
       - traefik.http.routers.prowlarr.tls.certresolver=myresolver
       - traefik.http.services.prowlarr.loadbalancer.server.port=9696
     restart: unless-stopped
-
-  radarr:
+  radarr: # A movie library manager that automates the process of searching for, downloading, and organizing movies from Usenet and torrent sources.
     image: ghcr.io/linuxserver/radarr
     container_name: radarr
     environment:
@@ -158,7 +157,7 @@ services:
       - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)
       - traefik.http.routers.radarr.entrypoints=websecure
       - traefik.http.routers.radarr.tls.certresolver=myresolver
-  sonarr:
+  sonarr: # A TV show library manager that automates the process of searching for, downloading, and organizing TV shows from Usenet and torrent sources.
     image: ghcr.io/linuxserver/sonarr
     container_name: sonarr
     environment:
@@ -175,7 +174,7 @@ services:
       - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)
       - traefik.http.routers.sonarr.entrypoints=websecure
       - traefik.http.routers.sonarr.tls.certresolver=myresolver  
-  lidarr:
+  lidarr: # A music library manager that automates the process of searching for, downloading, and organizing music albums from Usenet and torrent sources.
     image: ghcr.io/linuxserver/lidarr
     container_name: lidarr
     environment:
@@ -193,9 +192,8 @@ services:
       - traefik.http.routers.lidarr.entrypoints=websecure
       - traefik.http.routers.lidarr.tls.certresolver=myresolver
 
-
 ### WEB FRONTENDS
-  heimdall:
+  heimdall: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
     image: ghcr.io/linuxserver/heimdall
     container_name: heimdall
     environment:
