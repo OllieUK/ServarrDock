@@ -3,212 +3,208 @@ version: '3.8'
 services:
 
   ### UPDATING CONTAINERS
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    restart: unless-stopped
+  watchtower: # Automatically monitors and updates running Docker containers when a new image is available.
+    image: containrrr/watchtower # The Watchtower Docker image
+    container_name: watchtower # The name of the container
+    restart: unless-stopped # Restart policy: always restart the container unless it was manually stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker.sock # Mount the Docker socket to allow Watchtower to communicate with the Docker daemon
     environment:
-      - TZ=${TZ} # Set the time zone
-      - WATCHTOWER_CLEANUP=true # Remove old images after updating
-      - WATCHTOWER_POLL_INTERVAL=86400 # Check for updates every 24 hours (in seconds)
+      - TZ=${TZ} # Set the time zone for the container
+      - WATCHTOWER_CLEANUP=true # Enable cleanup of old images after updating containers
+      - WATCHTOWER_POLL_INTERVAL=86400 # Set the interval for checking for updates (86400 seconds = 24 hours)
 
   ### NETWORK SERVICES
-  traefik:  # Automatically monitors and updates running Docker containers when a new image is available.
-    image: traefik:v2.5
-    container_name: traefik
+  traefik:  # A modern reverse proxy and load balancer that enables routing requests from clients to the appropriate backend service based on the requested domain.
+    image: traefik:v2.5 # The Traefik Docker image (version 2.5)
+    container_name: traefik # The name of the container
     command:
-      - "--log.level=INFO"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare"
-      - "--certificatesresolvers.myresolver.acme.email=${CF_API_EMAIL}"
-      - "--certificatesresolvers.myresolver.acme.storage=/acme.json"
-      - "--certificatesResolvers.myresolver.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53"
-      # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
-      - "--api.dashboard=true"
-
-    ports:
-      - "80:80"
-      - "443:443"
-
-    environment:
-      - "CF_API_EMAIL=${CF_API_EMAIL}"
-      - "CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}"
-
-    labels:
-    - "traefik.enable=true"
-    - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
-    - "traefik.http.routers.traefik.entrypoints=websecure"
-    - "traefik.http.routers.traefik.tls.certresolver=myresolver"
-    - "traefik.http.routers.traefik.service=api@internal"
-    - "traefik.http.routers.traefik.tls=true"
-    - "traefik.http.routers.traefik.tls.domains[0].main=${DOMAIN}"
-    - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}"
-
-
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./config/traefik/acme.json:/acme.json"
-
-    networks:
-      - my-network
+      - "--log.level=INFO" # Set the log level to INFO
+      - "--providers.docker=true" # Enable Docker as a configuration provider
+      - "--providers.docker.exposedbydefault=false" # Disable exposing containers by default
+      - "--entrypoints.web.address=:80" # Define the web entrypoint listening on port 80
+      - "--entrypoints.websecure.address=:443" # Define the websecure entrypoint listening on port 443
+      - "--certificatesresolvers.myresolver.acme.dnschallenge=true" # Enable DNS challenge for Let's Encrypt
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare" # Set Cloudflare as the DNS provider
+      - "--certificatesresolvers.myresolver.acme.email=${CF_API_EMAIL}" # Set the email for Let's Encrypt registration
+      - "--certificatesresolvers.myresolver.acme.storage=/acme.json" # Define the storage file for ACME certificates
+      - "--certificatesResolvers.myresolver.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53" # Set the DNS resolvers for the DNS challenge
+      # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory" # (Optional) Use the Let's Encrypt staging server for testing
+      - "--api.dashboard=true" # Enable the Traefik dashboard
+    ports: # Expose container ports to the host
+      - "80:80" # Expose HTTP port
+      - "443:443" # Expose HTTPS port
+    environment: # Environment variables for the container
+      - "CF_API_EMAIL=${CF_API_EMAIL}" # Cloudflare API email
+      - "CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}" # Cloudflare DNS API token
+    labels: # Traefik-specific labels for routing and SSL
+      - "traefik.enable=true" # Enable Traefik for this container
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)" # Router rule to match the host
+      - "traefik.http.routers.traefik.entrypoints=websecure" # Use the websecure entrypoint
+      - "traefik.http.routers.traefik.tls.certresolver=myresolver" # Use the defined certificate resolver
+      - "traefik.http.routers.traefik.service=api@internal" # Use the internal Traefik API service
+      - "traefik.http.routers.traefik.tls=true" # Enable TLS
+      - "traefik.http.routers.traefik.tls.domains[0].main=${DOMAIN}" # Define the main domain for TLS
+      - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}" # Define a wildcard subdomain for TLS
+    volumes: # Bind mount host volumes to the container
+      - "/var/run/docker.sock:/var/run/docker.sock:ro" # Mount the Docker socket (read-only)
+      - "./config/traefik/acme.json:/acme.json" # Mount the ACME storage file
+    networks: # Connect the container to the specified network
+      - my-network # The custom network
   gluetun:  # A VPN client container that supports multiple VPN providers, allowing your other containers to route their traffic through a secure VPN tunnel.
-    image: qmcgaw/gluetun:latest
-    container_name: gluetun
+    image: qmcgaw/gluetun:latest # The Gluetun Docker image (latest version)
+    container_name: gluetun # The name of the container
     devices:
-      - /dev/net/tun:/dev/net/tun
-    environment:
-      - VPNSP=${VPNSP}
-      - OPENVPN_USER=${OPENVPN_USER}
-      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
-      - REGION=${VPN_REGION}
-      - TZ=${TZ}
+      - /dev/net/tun:/dev/net/tun # Mount the TUN device for VPN tunneling
+    environment: # Environment variables for the container
+      - VPNSP=${VPNSP} # VPN service provider
+      - OPENVPN_USER=${OPENVPN_USER} # VPN username
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD} # VPN password
+      - REGION=${VPN_REGION} # VPN server region
+      - TZ=${TZ} # Time zone
     cap_add:
-      - NET_ADMIN
+      - NET_ADMIN # Grant the container network administration capabilities
     networks:
-      - my-network
-    ports:
-      - 8080:8080  #SABnzbd
-      - 8090:8090  #qBittorrent
-    labels:
-      - traefik.enable=true
+      - my-network # Connect the container to the custom network
+    ports: # Expose container ports to the host
+      - 8080:8080  # SABnzbd web interface
+      - 8090:8090  # qBittorrent web interface
+    labels: # Traefik-specific labels for routing and SSL
+      - traefik.enable=true # Enable Traefik for this container
 
-      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.${DOMAIN}`)
-      - traefik.http.routers.sabnzbd.service=sabnzbd
-      - traefik.http.routers.sabnzbd.entrypoints=websecure
-      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver
-      - traefik.http.services.sabnzbd.loadbalancer.server.port=8080
+      # SABnzbd labels
+      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.${DOMAIN}`) # Router rule to match the host
+      - traefik.http.routers.sabnzbd.service=sabnzbd # Define the service name
+      - traefik.http.routers.sabnzbd.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # Use the defined certificate resolver
+      - traefik.http.services.sabnzbd.loadbalancer.server.port=8080 # Define the service port
 
-      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.${DOMAIN}`)
-      - traefik.http.routers.qbittorrent.service=qbittorrent
-      - traefik.http.routers.qbittorrent.entrypoints=websecure
-      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
-      - traefik.http.services.qbittorrent.loadbalancer.server.port=8090
+      # qBittorrent labels
+      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.${DOMAIN}`) # Router rule to match the host
+      - traefik.http.routers.qbittorrent.service=qbittorrent # Define the service name
+      - traefik.http.routers.qbittorrent.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # Use the defined certificate resolver
+      - traefik.http.services.qbittorrent.loadbalancer.server.port=8090 # Define the service port
 
-    restart: unless-stopped
-    volumes:
-      - ./config/gluetun:/gluetun
+    restart: unless-stopped # Restart policy
+    volumes: # Bind mount host volumes to the container
+      - ./config/gluetun:/gluetun # Mount the Gluetun configuration directory
 
 ### DOWNLOAD CLIENTS
   sabnzbd:  # A Usenet binary newsreader that automates the process of downloading and decoding binary files from Usenet newsgroups.
-    image: ghcr.io/linuxserver/sabnzbd
-    container_name: sabnzbd
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - SABNZDB_HOST=0.0.0.0
-    volumes:
-      - ./config/sabnzbd:/config
-      - ./media:/media
-    network_mode: "service:gluetun"
+    image: ghcr.io/linuxserver/sabnzbd # The SABnzbd Docker image from the LinuxServer.io repository
+    container_name: sabnzbd # The name of the container
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+      - SABNZDB_HOST=0.0.0.0 # Bind the SABnzbd service to all available network interfaces
+    volumes: # Bind mount host volumes to the container
+      - ./config/sabnzbd:/config # Mount the SABnzbd configuration directory
+      - ./media:/media # Mount the media directory for storing downloaded files
+    network_mode: "service:gluetun" # Use the Gluetun container's network, routing SABnzbd traffic through the VPN tunnel
   qbittorrent:  # A lightweight and feature-rich BitTorrent client that enables you to download torrents and manage your torrent files.
-    image: ghcr.io/linuxserver/qbittorrent
-    container_name: qbittorrent
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - WEBUI_PORT=8090
-    volumes:
-      - ./config/qbittorrent:/config
-      - ./media:/media
-    network_mode: "service:gluetun"
+    image: ghcr.io/linuxserver/qbittorrent # The qBittorrent Docker image from the LinuxServer.io repository
+    container_name: qbittorrent # The name of the container
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+      - WEBUI_PORT=8090 # Port for the qBittorrent web interface
+    volumes: # Bind mount host volumes to the container
+      - ./config/qbittorrent:/config # Mount the qBittorrent configuration directory
+      - ./media:/media # Mount the media directory for storing downloaded files
+    network_mode: "service:gluetun" # Use the Gluetun container's network, routing qBittorrent traffic through the VPN tunnel
 
 ### MEDIA MANAGERS
   prowlarr: # A meta-indexer and search aggregator for Usenet and torrent indexers, simplifying the integration between indexers and media managers like Sonarr, Radarr, and Lidarr.
-    image: ghcr.io/linuxserver/prowlarr:latest
-    container_name: prowlarr
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    volumes:
-      - ./config/prowlarr:/config
-      - ./media:/media
+    image: ghcr.io/linuxserver/prowlarr:latest # The Prowlarr Docker image from the LinuxServer.io repository
+    container_name: prowlarr # The name of the container
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+    volumes: # Bind mount host volumes to the container
+      - ./config/prowlarr:/config # Mount the Prowlarr configuration directory
+      - ./media:/media # Mount the media directory for storing downloaded files
     networks:
-      - my-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`)
-      - traefik.http.routers.prowlarr.entrypoints=websecure
-      - traefik.http.routers.prowlarr.tls.certresolver=myresolver
-      - traefik.http.services.prowlarr.loadbalancer.server.port=9696
-    restart: unless-stopped
+      - my-network # Connect the container to the custom network
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`) # Define the routing rule for Prowlarr based on the domain
+      - traefik.http.routers.prowlarr.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.services.prowlarr.loadbalancer.server.port=9696 # Define the port for the Prowlarr service
+    restart: unless-stopped # Restart policy for the container
   radarr: # A movie library manager that automates the process of searching for, downloading, and organizing movies from Usenet and torrent sources.
-    image: ghcr.io/linuxserver/radarr
-    container_name: radarr
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    volumes:
-      - ./config/radarr:/config
-      - ./media:/media
+    image: ghcr.io/linuxserver/radarr # The Radarr Docker image from the LinuxServer.io repository
+    container_name: radarr # The name of the container
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+    volumes: # Bind mount host volumes to the container
+      - ./config/radarr:/config # Mount the Radarr configuration directory
+      - ./media:/media # Mount the media directory for storing downloaded movies
     networks:
-      - my-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)
-      - traefik.http.routers.radarr.entrypoints=websecure
-      - traefik.http.routers.radarr.tls.certresolver=myresolver
+      - my-network # Connect the container to the custom network
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`) # Define the routing rule for Radarr based on the domain
+      - traefik.http.routers.radarr.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.radarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
   sonarr: # A TV show library manager that automates the process of searching for, downloading, and organizing TV shows from Usenet and torrent sources.
-    image: ghcr.io/linuxserver/sonarr
-    container_name: sonarr
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    volumes:
-      - ./config/sonarr:/config
-      - ./media:/media
+    image: ghcr.io/linuxserver/sonarr # The Sonarr Docker image from the LinuxServer.io repository
+    container_name: sonarr # The name of the container
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+    volumes: # Bind mount host volumes to the container
+      - ./config/sonarr:/config # Mount the Sonarr configuration directory
+      - ./media:/media # Mount the media directory for storing downloaded TV shows
     networks:
-      - my-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)
-      - traefik.http.routers.sonarr.entrypoints=websecure
-      - traefik.http.routers.sonarr.tls.certresolver=myresolver  
+      - my-network # Connect the container to the custom network
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`) # Define the routing rule for Sonarr based on the domain
+      - traefik.http.routers.sonarr.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.sonarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
   lidarr: # A music library manager that automates the process of searching for, downloading, and organizing music albums from Usenet and torrent sources.
-    image: ghcr.io/linuxserver/lidarr
-    container_name: lidarr
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    volumes:
-      - ./config/lidarr:/config
-      - ./media:/media
+    image: ghcr.io/linuxserver/lidarr # The Lidarr Docker image from the LinuxServer.io repository
+    container_name: lidarr # The name of the container
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+    volumes: # Bind mount host volumes to the container
+      - ./config/lidarr:/config # Mount the Lidarr configuration directory
+      - ./media:/media # Mount the media directory for storing downloaded music albums
     networks:
-      - my-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`)
-      - traefik.http.routers.lidarr.entrypoints=websecure
-      - traefik.http.routers.lidarr.tls.certresolver=myresolver
+      - my-network # Connect the container to the custom network
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`) # Define the routing rule for Lidarr based on the domain
+      - traefik.http.routers.lidarr.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.lidarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
 
 ### WEB FRONTENDS
   heimdall: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
-    image: ghcr.io/linuxserver/heimdall
-    container_name: heimdall
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    volumes:
-      - ./config/heimdall:/config
+    image: ghcr.io/linuxserver/heimdall # The Heimdall Docker image from the LinuxServer.io repository
+    container_name: heimdall # The name of the container
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+    volumes: # Bind mount host volumes to the container
+      - ./config/heimdall:/config # Mount the Heimdall configuration directory
     networks:
-      - my-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.heimdall.rule=Host(`heimdall.${DOMAIN}`)
-      - traefik.http.routers.heimdall.entrypoints=websecure
-      - traefik.http.routers.heimdall.tls.certresolver=myresolver
+      - my-network # Connect the container to the custom network
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.heimdall.rule=Host(`heimdall.${DOMAIN}`) # Define the routing rule for Heimdall based on the domain
+      - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
 
 
   # Add your other services here
@@ -216,8 +212,8 @@ services:
   # ...
 
 networks:
-  my-network:
-    driver: bridge
-    ipam:
+  my-network: # Name of the custom network
+    driver: bridge # Use the bridge network driver, which connects containers on the same host
+    ipam: # IP Address Management (IPAM) configuration
       config:
-        - subnet: 172.25.0.0/16
+        - subnet: 172.25.0.0/16 # Define the subnet for the custom network (CIDR notation)
