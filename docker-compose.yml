@@ -30,13 +30,13 @@ services:
 
     labels:
     - "traefik.enable=true"
-    - "traefik.http.routers.traefik.rule=Host(`traefik.dev.carr-it.net`)"
+    - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
     - "traefik.http.routers.traefik.entrypoints=websecure"
     - "traefik.http.routers.traefik.tls.certresolver=myresolver"
     - "traefik.http.routers.traefik.service=api@internal"
     - "traefik.http.routers.traefik.tls=true"
-    - "traefik.http.routers.traefik.tls.domains[0].main=dev.carr-it.net"
-    - "traefik.http.routers.traefik.tls.domains[0].sans=*.dev.carr-it.net"
+    - "traefik.http.routers.traefik.tls.domains[0].main=${DOMAIN}"
+    - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}"
 
 
     volumes:
@@ -66,13 +66,13 @@ services:
     labels:
       - traefik.enable=true
 
-      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.dev.carr-it.net`)
+      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.${DOMAIN}`)
       - traefik.http.routers.sabnzbd.service=sabnzbd
       - traefik.http.routers.sabnzbd.entrypoints=websecure
       - traefik.http.routers.sabnzbd.tls.certresolver=myresolver
       - traefik.http.services.sabnzbd.loadbalancer.server.port=8080
 
-      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.dev.carr-it.net`)
+      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.${DOMAIN}`)
       - traefik.http.routers.qbittorrent.service=qbittorrent
       - traefik.http.routers.qbittorrent.entrypoints=websecure
       - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
@@ -124,7 +124,7 @@ services:
       - my-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.dev.carr-it.net`)
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`)
       - traefik.http.routers.prowlarr.entrypoints=websecure
       - traefik.http.routers.prowlarr.tls.certresolver=myresolver
       - traefik.http.services.prowlarr.loadbalancer.server.port=9696
@@ -144,7 +144,7 @@ services:
       - my-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.radarr.rule=Host(`radarr.dev.carr-it.net`)
+      - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)
       - traefik.http.routers.radarr.entrypoints=websecure
       - traefik.http.routers.radarr.tls.certresolver=myresolver
   sonarr:
@@ -161,7 +161,7 @@ services:
       - my-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.sonarr.rule=Host(`sonarr.dev.carr-it.net`)
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)
       - traefik.http.routers.sonarr.entrypoints=websecure
       - traefik.http.routers.sonarr.tls.certresolver=myresolver  
   lidarr:
@@ -178,7 +178,7 @@ services:
       - my-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.lidarr.rule=Host(`lidarr.dev.carr-it.net`)
+      - traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`)
       - traefik.http.routers.lidarr.entrypoints=websecure
       - traefik.http.routers.lidarr.tls.certresolver=myresolver
 
@@ -197,7 +197,7 @@ services:
       - my-network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.heimdall.rule=Host(`heimdall.dev.carr-it.net`)
+      - traefik.http.routers.heimdall.rule=Host(`heimdall.${DOMAIN}`)
       - traefik.http.routers.heimdall.entrypoints=websecure
       - traefik.http.routers.heimdall.tls.certresolver=myresolver
 
