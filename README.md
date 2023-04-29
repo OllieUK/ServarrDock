@@ -7,3 +7,34 @@ While most of the configuration is done via the docker-compose.yml and .env file
 Add the FQDN of your SABnzbd service to the sabnzbd.ini file at ./config/sabnzbd.ini
 You need to find the 'host_whitelist' setting and add the name of your container, e.g.
 host_whitelist = sabnzbd.example.com
+
+## Services Overview
+
+                                    +-----------------+
+                                    |                 |
+                                +--->    Traefik      |
+                                |   | (Reverse Proxy) |
+                                |   |                 |
+                                |   +--------+--------+
+                                |            |
++-------------------------------+------------+-----------------------------+
+|                               |            |                             |
+|  +--------+  +--------+  +----v----+  +----v----+  +----v----+  +--------+ |
+|  |        |  |        |  |         |  |         |  |         |  |        | |
+|  | Sonarr +--+ Radarr +--+ Lidarr +--+ Prowlarr +--+ Heimdall|  | Gluetun| |
+|  |        |  |        |  |         |  |         |  |         |  |        | |
+|  +----+---+  +----+---+  +----+----+  +----+----+  +----+----+  +----+---+ |
+|       |           |           |           |           |           |       |
+|       |           |           |           |           |           |       |
++-------+-----------+-----------+-----------+-----------+-----------+-------+
+        |           |           |           |           |           |
+        |           |           |           |           |           |
++-------v-----------v-----------v-----------v-----------v-----------v-------+
+|                                                                          |
+|  +--------+  +--------+               +------------------+               |
+|  |        |  |        |               |                  |               |
+|  | SABnzbd +--+ qBittorrent           |    Gluetun       |               |
+|  |        |  |        |               |   (VPN Client)   |               |
+|  +--------+  +--------+               +------------------+               |
+|                                                                          |
++--------------------------------------------------------------------------+
