@@ -52,7 +52,7 @@ services:
       - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}" # Define a wildcard subdomain for TLS
     volumes: # Bind mount host volumes to the container
       - "/var/run/docker.sock:/var/run/docker.sock:ro" # Mount the Docker socket (read-only)
-      - "./config/traefik/acme.json:/acme.json" # Mount the ACME storage file
+      - "${CONFIG_PATH}/traefik/acme.json:/acme.json" # Mount the ACME storage file
     networks: # Connect the container to the specified network
       - my-network # The custom network
   gluetun:  # A VPN client container that supports multiple VPN providers, allowing your other containers to route their traffic through a secure VPN tunnel.
@@ -92,7 +92,7 @@ services:
 
     restart: unless-stopped # Restart policy
     volumes: # Bind mount host volumes to the container
-      - ./config/gluetun:/gluetun # Mount the Gluetun configuration directory
+      - ${CONFIG_PATH}/gluetun:/gluetun # Mount the Gluetun configuration directory
 
 ### DOWNLOAD CLIENTS
   sabnzbd:  # A Usenet binary newsreader that automates the process of downloading and decoding binary files from Usenet newsgroups.
@@ -104,8 +104,8 @@ services:
       - TZ=${TZ} # Time zone
       - SABNZDB_HOST=0.0.0.0 # Bind the SABnzbd service to all available network interfaces
     volumes: # Bind mount host volumes to the container
-      - ./config/sabnzbd:/config # Mount the SABnzbd configuration directory
-      - ./media:/media # Mount the media directory for storing downloaded files
+      - ${CONFIG_PATH}/sabnzbd:/config # Mount the SABnzbd configuration directory
+      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
     network_mode: "service:gluetun" # Use the Gluetun container's network, routing SABnzbd traffic through the VPN tunnel
   qbittorrent:  # A lightweight and feature-rich BitTorrent client that enables you to download torrents and manage your torrent files.
     image: ghcr.io/linuxserver/qbittorrent # The qBittorrent Docker image from the LinuxServer.io repository
@@ -116,8 +116,8 @@ services:
       - TZ=${TZ} # Time zone
       - WEBUI_PORT=8090 # Port for the qBittorrent web interface
     volumes: # Bind mount host volumes to the container
-      - ./config/qbittorrent:/config # Mount the qBittorrent configuration directory
-      - ./media:/media # Mount the media directory for storing downloaded files
+      - ${CONFIG_PATH}/qbittorrent:/config # Mount the qBittorrent configuration directory
+      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
     network_mode: "service:gluetun" # Use the Gluetun container's network, routing qBittorrent traffic through the VPN tunnel
 
 ### MEDIA MANAGERS
@@ -129,8 +129,8 @@ services:
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
     volumes: # Bind mount host volumes to the container
-      - ./config/prowlarr:/config # Mount the Prowlarr configuration directory
-      - ./media:/media # Mount the media directory for storing downloaded files
+      - ${CONFIG_PATH}/prowlarr:/config # Mount the Prowlarr configuration directory
+      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
     networks:
       - my-network # Connect the container to the custom network
     labels: # Traefik configuration labels
@@ -148,8 +148,8 @@ services:
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
     volumes: # Bind mount host volumes to the container
-      - ./config/radarr:/config # Mount the Radarr configuration directory
-      - ./media:/media # Mount the media directory for storing downloaded movies
+      - ${CONFIG_PATH}/radarr:/config # Mount the Radarr configuration directory
+      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded movies
     networks:
       - my-network # Connect the container to the custom network
     labels: # Traefik configuration labels
@@ -165,8 +165,8 @@ services:
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
     volumes: # Bind mount host volumes to the container
-      - ./config/sonarr:/config # Mount the Sonarr configuration directory
-      - ./media:/media # Mount the media directory for storing downloaded TV shows
+      - ${CONFIG_PATH}/sonarr:/config # Mount the Sonarr configuration directory
+      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded TV shows
     networks:
       - my-network # Connect the container to the custom network
     labels: # Traefik configuration labels
@@ -182,8 +182,8 @@ services:
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
     volumes: # Bind mount host volumes to the container
-      - ./config/lidarr:/config # Mount the Lidarr configuration directory
-      - ./media:/media # Mount the media directory for storing downloaded music albums
+      - ${CONFIG_PATH}/lidarr:/config # Mount the Lidarr configuration directory
+      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded music albums
     networks:
       - my-network # Connect the container to the custom network
     labels: # Traefik configuration labels
@@ -201,7 +201,7 @@ services:
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
     volumes: # Bind mount host volumes to the container
-      - ./config/heimdall:/config # Mount the Heimdall configuration directory
+      - ${CONFIG_PATH}/heimdall:/config # Mount the Heimdall configuration directory
     networks:
       - my-network # Connect the container to the custom network
     labels: # Traefik configuration labels

@@ -39,3 +39,18 @@ After completing the installation, you need to configure the SABnzbd service. Ad
 ### Automatic Updates with Watchtower
 
 ServarrDock uses Watchtower to automatically monitor and update running Docker containers when a new image is available. Watchtower is pre-configured to remove old images after updating and check for updates every 24 hours. No additional configuration is needed for Watchtower, and your services will be updated automatically.
+
+## Folder Setup
+
+To set up the folder structure for your downloads and media, follow these steps:
+
+1. Create the `downloads` and `media` folders within the `./media` volume, if they don't exist already.
+2. Inside the `downloads` folder, create two sub-folders named `torrent` and `nzb`.
+3. Inside the `media` folder, create sub-folders for each media type you wish to store, such as `movies`, `tv`, `music`, etc.
+
+After setting up the folder structure, you need to configure the downloaders and media managers to use these folders:
+
+1. Configure the downloaders (SABnzbd and qBittorrent) to save downloaded files to the respective `torrent` or `nzb` sub-folders within the `downloads` folder.
+2. Configure the media managers (Radarr, Sonarr, Lidarr) to scan and organize media files within the `media` folder and its sub-folders.
+
+By following these steps, you will have a seamless integration between downloaders and media managers, without the need to copy files between volumes.
