@@ -1,20 +1,17 @@
 # ServarrDock: Self-Hosted Media Management and Automation System
 
-ServarrDock provides a comprehensive self-hosted media management and automation system that aims to simplify and streamline the process of downloading, organizing, and accessing your media content.
+ServarrDock is a comprehensive Docker-based solution for self-hosted media management. It includes a wide range of media-related services such as Sonarr, Radarr, Lidarr, downloaders, Plex, Ombi, and more. These services are integrated and managed using Traefik as a reverse proxy, with built-in support for Cloudflare and Let's Encrypt SSL certificates.
 
-The system includes a reverse proxy (Traefik) that makes it easy to access all your services through a single domain with HTTPS. It is integrated with a variety of services for media library management, including TV shows, movies, and music. These services automate the process of searching, downloading, and organizing media files from Usenet and torrent sources. The system also features a VPN client (Gluetun) that secures the downloaders' network traffic, ensuring privacy and security.
+## Services Included
 
-Additionally, the system includes a meta-indexer and search aggregator (Prowlarr) that simplifies the integration between the media library managers and indexers. To make managing your services more accessible, a web-based front-end dashboard (Heimdall) is included, allowing you to organize, manage, and access all your self-hosted services in one place.
-
-This project is designed to be easily extensible, allowing you to add or remove services as needed, according to your preferences.
-
-## Components
-
-- *Traefik*: Reverse proxy that manages and routes traffic to various services.
-- *Servarr Media Library Managers*: Automate the process of searching, downloading, and organizing media files from Usenet and torrent sources. There are various services, e.g. Radarr for movies, Sonarr for TV series, Lidarr for music. More details can be found in the [Servarr Wiki](https://wiki.servarr.com/).
-- *Gluetun*: VPN client that secures the network traffic of the downloaders.
-- *Prowlarr*: Meta-indexer and search aggregator that simplifies integration between media library managers and indexers.
-- *Heimdall*: Web-based front-end dashboard for organizing, managing, and accessing your self-hosted services.
+- Sonarr, Radarr, Lidarr: Media managers for TV shows, movies, and music respectively
+- SABnzbd and qBittorrent: Downloaders for Usenet and torrent content
+- Gluetun: VPN service for secure and private downloading
+- Prowlarr: Meta-indexer and search aggregator for Usenet and torrent indexers
+- Plex: Media server for organizing and streaming your media library
+- Ombi: Request management and user management tool, integrated with Plex, Sonarr, Radarr, and Lidarr
+- Heimdall: Web-based front-end dashboard for organizing and accessing all your self-hosted services
+- Watchtower: Automatic Docker container updates
 
 ## Folder Structure
 
