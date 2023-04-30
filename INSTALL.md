@@ -1,56 +1,38 @@
-# Installation Instructions for ServarrDock
+# ServarrDock Installation Guide
+
+This guide will walk you through the installation and configuration process for setting up ServarrDock, a comprehensive media management solution.
 
 ## Prerequisites
 
 - Docker and Docker Compose installed on your system
-- A domain name properly configured with DNS records
-- Your preferred VPN provider's configuration files and credentials
+- A domain configured with Cloudflare for SSL certificate generation and management
+- An understanding of the services included in ServarrDock and their dependencies
 
-## Installation
+## Installation Steps
 
-1. Clone the ServarrDock repository:
+1. Clone the ServarrDock repository from [GitHub](https://github.com/OllieUK/ServarrDock).
+2. Copy the `.env.example` file to a new file named `.env`.
+3. Update the `.env` file with your personal settings, API keys, and credentials.
+4. Run `docker-compose up -d` to start the services.
+5. Configure and set up each service according to the order specified below:
+   - Media managers (Sonarr, Radarr, Lidarr)
+   - Downloaders (SABnzbd, qBittorrent)
+   - Gluetun
+   - Prowlarr
+   - Plex
+   - Ombi (requires media managers and Plex to be running)
+   - Heimdall
+6. Once all services are up and running, configure the inter-service connections using their API keys and endpoints.
 
-`git clone https://github.com/OllieUK/ServarrDock.git`
+## Dependencies and Configuration Order
 
-2. Change to the ServarrDock directory:
+It's essential to set up and configure the services in the following order due to their dependencies:
 
-`cd ServarrDock`
+1. Media managers (Sonarr, Radarr, Lidarr) and Plex: These services should be set up and running before configuring Ombi, as it relies on their API endpoints.
+2. Ombi: After the media managers and Plex are running, you can set up Ombi to handle requests and user management.
 
+For detailed instructions on how to configure each service, refer to their respective documentation.
 
-3. Copy `.env.example` to `.env`:
+## Volumes and Folder Structure
 
-`cp .env.example .env`
-
-4. Edit the `.env` file and provide values for all required variables.
-
-5. Start the containers using Docker Compose:
-
-`docker-compose up -d`
-
-
-## Post-Installation Configuration
-
-### SABnzbd Host Configuration
-
-After completing the installation, you need to configure the SABnzbd service. Add the FQDN (Fully Qualified Domain Name) of your SABnzbd service to the `sabnzbd.ini` file at `./config/sabnzbd.ini`. You need to find the `host_whitelist` setting and add the name of your container, e.g.,
-
-`host_whitelist = sabnzbd.example.com`
-
-### Automatic Updates with Watchtower
-
-ServarrDock uses Watchtower to automatically monitor and update running Docker containers when a new image is available. Watchtower is pre-configured to remove old images after updating and check for updates every 24 hours. No additional configuration is needed for Watchtower, and your services will be updated automatically.
-
-## Folder Setup
-
-To set up the folder structure for your downloads and media, follow these steps:
-
-1. Create the `downloads` and `media` folders within the `./media` volume, if they don't exist already.
-2. Inside the `downloads` folder, create two sub-folders named `torrent` and `nzb`.
-3. Inside the `media` folder, create sub-folders for each media type you wish to store, such as `movies`, `tv`, `music`, etc.
-
-After setting up the folder structure, you need to configure the downloaders and media managers to use these folders:
-
-1. Configure the downloaders (SABnzbd and qBittorrent) to save downloaded files to the respective `torrent` or `nzb` sub-folders within the `downloads` folder.
-2. Configure the media managers (Radarr, Sonarr, Lidarr) to scan and organize media files within the `media` folder and its sub-folders.
-
-By following these steps, you will have a seamless integration between downloaders and media managers, without the need to copy files between volumes.
+When setting up the services, ensure that the appropriate volumes and folder structures are in place. The `./media` volume should contain a folder for downloads, with subfolders for torrent and nzb downloads, and a folder for media, with subfolders for different media types. The structure of the media subfolders is up to the user. Both will need to be set up in the configurations of the downloaders and the media managers.
