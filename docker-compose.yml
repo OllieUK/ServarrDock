@@ -1,3 +1,7 @@
+# ServarrDock: A self-hosted media management and automation system composed of various services.
+# It includes a reverse proxy, downloaders, media library managers, and a dashboard.
+# The downloaders are secured through a VPN service to maintain privacy.
+
 version: '3.8'
 
 services:
