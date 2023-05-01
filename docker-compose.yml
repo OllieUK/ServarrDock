@@ -23,7 +23,7 @@ services:
     image: traefik:v2.5 # The Traefik Docker image (version 2.5)
     container_name: traefik # The name of the container
     command:
-      - "--log.level=INFO" # Set the log level to INFO
+      - "--log.level=DEBUG" # Set the log level to INFO
       - "--providers.docker=true" # Enable Docker as a configuration provider
       - "--providers.docker.exposedbydefault=false" # Disable exposing containers by default
       - "--entrypoints.web.address=:80" # Define the web entrypoint listening on port 80
