@@ -22,6 +22,7 @@ node_modules/
 .vscode/
 *.sublime-project
 *.sublime-
+*.code-workspace
 
 # Ignore acme.json certificates file
 config/traefik/acme.json
