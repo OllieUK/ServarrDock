@@ -13,8 +13,9 @@ This guide will walk you through the installation and configuration process for 
 1. Clone the ServarrDock repository from [GitHub](https://github.com/OllieUK/ServarrDock).
 2. Copy the `.env.example` file to a new file named `.env`.
 3. Update the `.env` file with your personal settings, API keys, and credentials.
-4. Run `docker-compose up -d` to start the services.
-5. Configure and set up each service according to the order specified below:
+4. Create a file named `acme.json` in the `./config/traefik` directory to store your SSL certificates, and set its permissions to 600: `chmod 600 acme.json`.
+5. Run `docker-compose up -d` to start the services.
+6. Configure and set up each service according to the order specified below:
    - Media managers (Sonarr, Radarr, Lidarr)
    - Downloaders (SABnzbd, qBittorrent)
    - Gluetun
@@ -22,7 +23,7 @@ This guide will walk you through the installation and configuration process for 
    - Plex
    - Ombi (requires media managers and Plex to be running)
    - Heimdall
-6. Once all services are up and running, configure the inter-service connections using their API keys and endpoints.
+7. Once all services are up and running, configure the inter-service connections using their API keys and endpoints.
 
 ## Dependencies and Configuration Order
 
