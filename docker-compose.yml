@@ -69,7 +69,9 @@ services:
     cap_add:
       - NET_ADMIN # Grant the container network administration capabilities
     networks:
-      - my-network # Connect the container to the custom network
+      my-network: # Connect the container to the custom network
+        aliases:
+        - gluetun # Create a network alias named "gluetun" to enable other containers to access this service's network
     ports: # Expose container ports to the host
       - 8080:8080  # SABnzbd web interface
       - 8090:8090  # qBittorrent web interface
@@ -131,8 +133,7 @@ services:
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/prowlarr:/config # Mount the Prowlarr configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
-    networks:
-      - my-network # Connect the container to the custom network
+    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`) # Define the routing rule for Prowlarr based on the domain
@@ -150,13 +151,13 @@ services:
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/radarr:/config # Mount the Radarr configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded movies
-    networks:
-      - my-network # Connect the container to the custom network
+    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`) # Define the routing rule for Radarr based on the domain
       - traefik.http.routers.radarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.radarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.services.radarr.loadbalancer.server.port=7878 # Define the port for the Radarr service  
   sonarr: # A TV show library manager that automates the process of searching for, downloading, and organizing TV shows from Usenet and torrent sources.
     image: ghcr.io/linuxserver/sonarr # The Sonarr Docker image from the LinuxServer.io repository
     container_name: sonarr # The name of the container
@@ -167,13 +168,13 @@ services:
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/sonarr:/config # Mount the Sonarr configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded TV shows
-    networks:
-      - my-network # Connect the container to the custom network
+    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`) # Define the routing rule for Sonarr based on the domain
       - traefik.http.routers.sonarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.sonarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.services.sonarr.loadbalancer.server.port=8989 # Define the port for the Sonarr service
   lidarr: # A music library manager that automates the process of searching for, downloading, and organizing music albums from Usenet and torrent sources.
     image: ghcr.io/linuxserver/lidarr # The Lidarr Docker image from the LinuxServer.io repository
     container_name: lidarr # The name of the container
@@ -184,13 +185,13 @@ services:
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/lidarr:/config # Mount the Lidarr configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded music albums
-    networks:
-      - my-network # Connect the container to the custom network
+    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`) # Define the routing rule for Lidarr based on the domain
       - traefik.http.routers.lidarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.lidarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.services.lidarr.loadbalancer.server.port=8686 # Define the port for the Lidarr service
 
 ### WEB FRONTENDS
   heimdall: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
