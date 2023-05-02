@@ -192,7 +192,24 @@ services:
       - traefik.http.routers.lidarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.lidarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.lidarr.loadbalancer.server.port=8686 # Define the port for the Lidarr service
-
+  bazarr:
+    image: ghcr.io/linuxserver/bazarr
+    container_name: bazarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_PATH}/bazarr:/config
+      - ${MEDIA_PATH}:/media
+    network_mode: "service:gluetun"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bazarr.rule=Host(`bazarr.${DOMAIN}`)
+      - traefik.http.routers.bazarr.entrypoints=websecure
+      - traefik.http.routers.bazarr.tls.certresolver=myresolver
+      - traefik.http.services.bazarr.loadbalancer.server.port=6767
+    restart: unless-stopped
 ### WEB FRONTENDS
   heimdall: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
     image: ghcr.io/linuxserver/heimdall # The Heimdall Docker image from the LinuxServer.io repository
