@@ -100,16 +100,6 @@ services:
       - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # Use the defined certificate resolver
       - traefik.http.services.qbittorrent.loadbalancer.server.port=8090 # Define the service port
 
-      # organizr labels
-      - traefik.http.routers.organizr-http.rule=Host(`organizr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.organizr-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.organizr-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.organizr.service=organizr # Define the service name
-      - traefik.http.routers.organizr.rule=Host(`organizr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.organizr.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.organizr.tls.certresolver=myresolver # Use the defined certificate resolver
-      - traefik.http.services.organizr.loadbalancer.server.port=8080 # Define the service port
-
     restart: unless-stopped # Restart policy
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/gluetun:/gluetun # Mount the Gluetun configuration directory
@@ -277,26 +267,6 @@ services:
       - traefik.http.routers.heimdall.rule=Host(`heimdall.${DOMAIN}`) # Define the routing rule for Heimdall based on the domain
       - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
-  organizr: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
-    image: 	ghcr.io/organizr/organizr # The organizr Docker image from the LinuxServer.io repository
-    container_name: organizr # The name of the container
-    depends_on:
-      - gluetun
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/organizr:/config # Mount the organizr configuration directory
-    network_mode: "service:gluetun"
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.organizr-http.rule=Host(`organizr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.organizr-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.organizr-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.organizr.rule=Host(`organizr.${DOMAIN}`) # Define the routing rule for organizr based on the domain
-      - traefik.http.routers.organizr.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.organizr.tls.certresolver=myresolver # Use the myresolver certificate resolver
 
 ### MEDIA PLAYERS
   plex:
