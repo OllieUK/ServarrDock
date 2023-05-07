@@ -74,9 +74,9 @@ services:
       my-network: # Connect the container to the custom network
         aliases:
         - gluetun # Create a network alias named "gluetun" to enable other containers to access this service's network
-    ports: # Expose container ports to the host
-      - 8080:8080  # SABnzbd web interface
-      - 8090:8090  # qBittorrent web interface
+#    ports: # Expose container ports to the host
+#      - 8080:8080  # SABnzbd web interface
+#      - 8090:8090  # qBittorrent web interface
     labels: # Traefik-specific labels for routing and SSL
       - traefik.enable=true # Enable Traefik for this container
 
@@ -88,17 +88,27 @@ services:
       - traefik.http.routers.sabnzbd.service=sabnzbd # Define the service name
       - traefik.http.routers.sabnzbd.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # Use the defined certificate resolver
-      - traefik.http.services.sabnzbd.loadbalancer.server.port=8080 # Define the service port
+      - traefik.http.services.sabnzbd.loadbalancer.server.port=8081 # Define the service port
       
       # qBittorrent labels
       - traefik.http.routers.qbittorrent-http.rule=Host(`qbittorrent.${DOMAIN}`)  # Define the HTTP router rule based on the domain
       - traefik.http.routers.qbittorrent-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.qbittorrent-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router      - traefik.http.routers.qbittorrent.service=qbittorrent # Define the service name
-      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.${DOMAIN}`)  # Define the HTTP router rule based on the domain
+      - traefik.http.routers.qbittorrent-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
       - traefik.http.routers.qbittorrent.service=qbittorrent # Define the service name
+      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.${DOMAIN}`)  # Define the HTTP router rule based on the domain
       - traefik.http.routers.qbittorrent.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # Use the defined certificate resolver
       - traefik.http.services.qbittorrent.loadbalancer.server.port=8090 # Define the service port
+
+      # organizr labels
+      - traefik.http.routers.organizr-http.rule=Host(`organizr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
+      - traefik.http.routers.organizr-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
+      - traefik.http.routers.organizr-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
+      - traefik.http.routers.organizr.service=organizr # Define the service name
+      - traefik.http.routers.organizr.rule=Host(`organizr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
+      - traefik.http.routers.organizr.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.organizr.tls.certresolver=myresolver # Use the defined certificate resolver
+      - traefik.http.services.organizr.loadbalancer.server.port=8080 # Define the service port
 
     restart: unless-stopped # Restart policy
     volumes: # Bind mount host volumes to the container
@@ -268,16 +278,17 @@ services:
       - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
   organizr: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
-    image: organizr/organizr # The organizr Docker image from the LinuxServer.io repository
+    image: 	ghcr.io/organizr/organizr # The organizr Docker image from the LinuxServer.io repository
     container_name: organizr # The name of the container
+    depends_on:
+      - gluetun
     environment: # Environment variables for the container
       - PUID=${PUID} # User ID for the container
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/organizr:/config # Mount the organizr configuration directory
-    networks:
-      - my-network # Connect the container to the custom network
+    network_mode: "service:gluetun"
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.organizr-http.rule=Host(`organizr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
