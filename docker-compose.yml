@@ -14,6 +14,8 @@ services:
     restart: unless-stopped # Restart policy: always restart the container unless it was manually stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Mount the Docker socket to allow Watchtower to communicate with the Docker daemon
+    networks:
+      my-network:
     environment:
       - TZ=${TZ} # Set the time zone for the container
       - WATCHTOWER_CLEANUP=true # Enable cleanup of old images after updating containers
@@ -58,7 +60,7 @@ services:
       - "${CONFIG_PATH}/traefik/acme.json:/acme.json" # Mount the ACME storage file
     networks: # Connect the container to the specified network
       my-network: # The custom network
-      plex-macvlan:
+      home-macvlan:
         ipv4_address: 192.168.15.249
   gluetun:  # A VPN client container that supports multiple VPN providers, allowing your other containers to route their traffic through a secure VPN tunnel.
     image: qmcgaw/gluetun:latest # The Gluetun Docker image (latest version)
@@ -75,10 +77,12 @@ services:
       - NET_ADMIN # Grant the container network administration capabilities
     networks:
       my-network: # Connect the container to the custom network
-        aliases:
-        - gluetun # Create a network alias named "gluetun" to enable other containers to access this service's network
-      plex-macvlan:
-        ipv4_address: 192.168.15.251
+      #   aliases:
+      #   - gluetun # Create a network alias named "gluetun" to enable other containers to access this service's network
+      # home-macvlan:
+      #   ipv4_address: 192.168.15.251
+      #  aliases:
+      #  - gluetun # Create a network alias named "gluetun" to enable other containers to access this service's network
     #ports: # Expose container ports to the host
     #  - 8080:8080  # SABnzbd web interface
     #  - 8090:8090  # qBittorrent web interface
@@ -86,24 +90,27 @@ services:
       - traefik.enable=true # Enable Traefik for this container
 
       # SABnzbd labels
-      - traefik.http.routers.sabnzbd-http.rule=Host(`sabnzbd.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.sabnzbd-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.sabnzbd-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.sabnzbd.service=sabnzbd # Define the service name
+      - traefik.http.routers.sabnzbd.rule=Host(`${DOMAIN}`) && PathPrefix(`/sabnzbd`)  # Define the HTTP router rule based on the domain
+      - traefik.http.routers.sabnzbd.service=sabnzbd-service # Define the service name
       - traefik.http.routers.sabnzbd.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # Use the defined certificate resolver
-      - traefik.http.services.sabnzbd.loadbalancer.server.port=8080 # Define the service port
+      - traefik.http.services.sabnzbd-service.loadbalancer.server.port=8080 # Define the service port
 
       # qBittorrent labels
-      - traefik.http.routers.qbittorrent-http.rule=Host(`qbittorrent.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.qbittorrent-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.qbittorrent-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.qbittorrent.service=qbittorrent # Define the service name
-      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.qbittorrent.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # Use the defined certificate resolver
-      - traefik.http.services.qbittorrent.loadbalancer.server.port=8090 # Define the service port
+      - traefik.http.routers.qbittorrent.service=qbittorrent-service # Define the service name
+      - traefik.http.routers.qbittorrent.entrypoints=websecure
+      - traefik.http.routers.qbittorrent.rule=Host(`${DOMAIN}`) && PathPrefix(`/qbittorrent`)
+      - traefik.http.routers.qbittorrent.tls=true
+      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
+      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.regex=^(.*)/qbittorrent$$
+      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.replacement=$$1/qbittorrent/
+      - traefik.http.middlewares.qbittorrent-strip.stripprefix.prefixes=/qbittorrent/
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.X-Frame-Options=SAMEORIGIN
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Referer=
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Origin=
+      - traefik.http.routers.qbittorrent.middlewares=qbittorrent-redirect,qbittorrent-strip,qbittorrent-headers
+      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=8090
+      - traefik.http.services.qbittorrent-service.loadbalancer.passhostheader=false
 
     restart: unless-stopped # Restart policy
     volumes: # Bind mount host volumes to the container
@@ -155,10 +162,7 @@ services:
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.prowlarr-http.rule=Host(`prowlarr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.prowlarr-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.prowlarr-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`) # Define the routing rule for Prowlarr based on the domain
+      - traefik.http.routers.prowlarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/prowlarr`) # Define the routing rule for Prowlarr based on the domain
       - traefik.http.routers.prowlarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.prowlarr.loadbalancer.server.port=9696 # Define the port for the Prowlarr service
@@ -178,10 +182,7 @@ services:
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.radarr-http.rule=Host(`radarr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.radarr-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.radarr-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`) # Define the routing rule for Radarr based on the domain
+      - traefik.http.routers.radarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/radarr`) # Define the routing rule for Radarr based on the domain
       - traefik.http.routers.radarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.radarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.radarr.loadbalancer.server.port=7878 # Define the port for the Radarr service  
@@ -200,10 +201,7 @@ services:
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.sonarr-http.rule=Host(`sonarr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.sonarr-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.sonarr-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
+      - traefik.http.routers.sonarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/sonarr`)  # Define the HTTP router rule based on the domain
       - traefik.http.routers.sonarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.sonarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.sonarr.loadbalancer.server.port=8989 # Define the port for the Sonarr service
@@ -222,10 +220,7 @@ services:
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.lidarr-http.rule=Host(`lidarr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.lidarr-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.lidarr-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`) # Define the routing rule for Lidarr based on the domain
+      - traefik.http.routers.lidarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/lidarr`) # Define the routing rule for Lidarr based on the domain
       - traefik.http.routers.lidarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.lidarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.lidarr.loadbalancer.server.port=8686 # Define the port for the Lidarr service
@@ -244,10 +239,7 @@ services:
     network_mode: "service:gluetun"
     labels:
       - traefik.enable=true
-      - traefik.http.routers.bazarr-http.rule=Host(`bazarr.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.bazarr-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.bazarr-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router- traefik.http.routers.bazarr.entrypoints=websecure
-      - traefik.http.routers.bazarr.rule=Host(`bazarr.${DOMAIN}`)
+      - traefik.http.routers.bazarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/bazarr`)
       - traefik.http.routers.bazarr.entrypoints=websecure
       - traefik.http.routers.bazarr.tls.certresolver=myresolver
       - traefik.http.services.bazarr.loadbalancer.server.port=6767
@@ -263,15 +255,18 @@ services:
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/heimdall:/config # Mount the Heimdall configuration directory
     networks:
-      - my-network # Connect the container to the custom network
+      my-network:
+      # home-macvlan: # Connect the container to the home-macvlan network
+      #   ipv4_address: 192.168.15.248
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.heimdall-http.rule=Host(`heimdall.${DOMAIN}`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.heimdall-http.entrypoints=web  # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.heimdall-http.middlewares=redirect-to-https  # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.heimdall.rule=Host(`heimdall.${DOMAIN}`) # Define the routing rule for Heimdall based on the domain
+      - traefik.http.routers.heimdall-http.rule=Host(`${DOMAIN}`) # Define the HTTP router rule for home.carr-it.net
+      - traefik.http.routers.heimdall-http.entrypoints=web # Use the 'web' entrypoint for the HTTP router
+      - traefik.http.routers.heimdall-http.middlewares=redirect-to-https # Apply the 'redirect-to-https' middleware to the HTTP router
+      - traefik.http.routers.heimdall.rule=Host(`${DOMAIN}`) # Define the routing rule for home.carr-it.net
       - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.services.heimdall.loadbalancer.server.port=80
   ombi: # A web application that gives Plex or Emby users the ability to request content
     image: linuxserver/ombi # The Ombi Docker image from the LinuxServer.io repository
     container_name: ombi # The name of the container
@@ -281,15 +276,13 @@ services:
       - TZ=${TZ} # Time zone
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/ombi:/config # Mount the Ombi configuration directory
-    networks: 
-      plex-macvlan:
+    networks:
+      my-network:
+      home-macvlan:
         ipv4_address: 192.168.15.250
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.ombi-http.rule=Host(`media.home.carr-it.net`) # Define the HTTP router rule based on the domain
-      - traefik.http.routers.ombi-http.entrypoints=web # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.ombi-http.middlewares=redirect-to-https # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.ombi.rule=Host(`media.home.carr-it.net`) # Use the websecure entrypoint
+      - traefik.http.routers.ombi.rule=Host(`${DOMAIN}`) && PathPrefix(`/ombi`) # Use the websecure entrypoint
       - traefik.http.routers.ombi.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.ombi.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.ombi.loadbalancer.server.port=3579 # Define the port for the Ombi service
@@ -311,7 +304,7 @@ services:
       - ${CONFIG_PATH}/plex:/config
       - ${MEDIA_PATH}:/media
     networks:
-      plex-macvlan:
+      home-macvlan:
         ipv4_address: 192.168.15.253
     # Uncomment the lines below for Intel GPU hardware acceleration
     devices:
@@ -340,7 +333,7 @@ networks:
     ipam: # IP Address Management (IPAM) configuration
       config:
         - subnet: 172.25.0.0/16 # Define the subnet for the custom network (CIDR notation)
-  plex-macvlan:
+  home-macvlan:
     driver: macvlan
     driver_opts:
       parent: ${NET_NIC_NAME}
