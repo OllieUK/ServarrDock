@@ -38,6 +38,8 @@ services:
       - "--certificatesResolvers.myresolver.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53" # Set the DNS resolvers for the DNS challenge
       # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory" # (Optional) Use the Let's Encrypt staging server for testing
       - "--api.dashboard=true" # Enable the Traefik dashboard
+      - "--providers.file.filename=/dynamic.yml"
+
     ports: # Expose container ports to the host
       - "80:80" # Expose HTTP port
       - "443:443" # Expose HTTPS port
@@ -53,11 +55,14 @@ services:
       - "traefik.http.routers.traefik.tls=true" # Enable TLS
       - "traefik.http.routers.traefik.tls.domains[0].main=${DOMAIN}" # Define the main domain for TLS
       - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}" # Define a wildcard subdomain for TLS
-      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https  # Create a middleware named 'redirect-to-https' for HTTP to HTTPS redirection
-      - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true  # Set the redirect as permanent (HTTP 301)
+      - "traefik.http.routers.traefik.middlewares=rateLimitMiddleware@file,authelia@file"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"  # Create a middleware named 'redirect-to-https' for HTTP to HTTPS redirection
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"  # Set the redirect as permanent (HTTP 301)
+      - "traefik.http.services.traefik-servarrdock.loadbalancer.server.port=8080"
     volumes: # Bind mount host volumes to the container
       - "/var/run/docker.sock:/var/run/docker.sock:ro" # Mount the Docker socket (read-only)
       - "${CONFIG_PATH}/traefik/acme.json:/acme.json" # Mount the ACME storage file
+      - "${CONFIG_PATH}/traefik/dynamic.yml:/dynamic.yml" # Mount the dynamic config file
     networks: # Connect the container to the specified network
       my-network: # The custom network
       home-macvlan:
@@ -77,44 +82,32 @@ services:
       - NET_ADMIN # Grant the container network administration capabilities
     networks:
       my-network: # Connect the container to the custom network
-      #   aliases:
-      #   - gluetun # Create a network alias named "gluetun" to enable other containers to access this service's network
-      # home-macvlan:
-      #   ipv4_address: 192.168.15.251
-      #  aliases:
-      #  - gluetun # Create a network alias named "gluetun" to enable other containers to access this service's network
-    #ports: # Expose container ports to the host
-    #  - 8080:8080  # SABnzbd web interface
-    #  - 8090:8090  # qBittorrent web interface
+
     labels: # Traefik-specific labels for routing and SSL
       - traefik.enable=true # Enable Traefik for this container
-
-      # SABnzbd labels
-      - traefik.http.routers.sabnzbd.rule=Host(`${DOMAIN}`) && PathPrefix(`/sabnzbd`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.sabnzbd.service=sabnzbd-service # Define the service name
-      - traefik.http.routers.sabnzbd.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # Use the defined certificate resolver
-      - traefik.http.services.sabnzbd-service.loadbalancer.server.port=8080 # Define the service port
-
-      # qBittorrent labels
-      - traefik.http.routers.qbittorrent.service=qbittorrent-service # Define the service name
-      - traefik.http.routers.qbittorrent.entrypoints=websecure
-      - traefik.http.routers.qbittorrent.rule=Host(`${DOMAIN}`) && PathPrefix(`/qbittorrent`)
-      - traefik.http.routers.qbittorrent.tls=true
-      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
-      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.regex=^(.*)/qbittorrent$$
-      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.replacement=$$1/qbittorrent/
-      - traefik.http.middlewares.qbittorrent-strip.stripprefix.prefixes=/qbittorrent/
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.X-Frame-Options=SAMEORIGIN
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Referer=
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Origin=
-      - traefik.http.routers.qbittorrent.middlewares=qbittorrent-redirect,qbittorrent-strip,qbittorrent-headers
-      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=8090
-      - traefik.http.services.qbittorrent-service.loadbalancer.passhostheader=false
 
     restart: unless-stopped # Restart policy
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/gluetun:/gluetun # Mount the Gluetun configuration directory
+  authelia:  # Authelia is an open-source authentication and authorization server providing 2-factor authentication and single sign-on (SSO) for your applications via a web portal.
+    image: authelia/authelia # The Authelia Docker image from the Docker Hub repository
+    container_name: authelia # The name of the container
+    volumes:
+      - ${CONFIG_PATH}/authelia:/config # Mounts the configuration files and the users database from the host into the container
+    environment:
+      - AUTHELIA_JWT_SECRET=${AUTHELIA_JWT_SECRET} # JWT secret used for stateless sessions. This should be a long, randomly generated string
+      - AUTHELIA_SESSION_SECRET=${AUTHELIA_SESSION_SECRET} # Session secret used by Authelia for server-side stored sessions. This should also be a long, randomly generated string
+      - AUTHELIA_NOTIFIER_SMTP_PASSWORD=${AUTHELIA_NOTIFIER_SMTP_PASSWORD} # Password for the SMTP server used to send verification emails (assuming you're using SMTP)
+      # Add other necessary environment variables based on your Authelia configuration
+    labels:
+      - "traefik.enable=true" # Enable Traefik for this container, it makes the Authelia service discoverable by Traefik
+      - "traefik.http.routers.authelia.rule=Host(`auth.home.carr-it.net`)" # Router rule that matches the domain name of the Authelia service
+      - "traefik.http.routers.authelia.entrypoints=websecure" # Defines the entrypoint for this router, it should be the HTTPS entrypoint
+      - "traefik.http.routers.authelia.tls.certresolver=myresolver" # This tells Traefik to use the previously defined certificate resolver for this service
+      - "traefik.http.services.authelia.loadbalancer.server.port=9091" # Authelia's internal port that needs to be exposed to the network
+      - "traefik.http.routers.authelia.middlewares=rateLimitMiddleware@file"
+    networks:
+      my-network: # The custom network, Authelia needs to be on the same network as Traefik for routing to work
 
 ### DOWNLOAD CLIENTS
   sabnzbd:  # A Usenet binary newsreader that automates the process of downloading and decoding binary files from Usenet newsgroups.
@@ -127,6 +120,14 @@ services:
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
       - SABNZDB_HOST=0.0.0.0 # Bind the SABnzbd service to all available network interfaces
+    labels:
+      - traefik.enable=true # Enable Traefik for this container    
+      - traefik.http.routers.sabnzbd.rule=Host(`${DOMAIN}`) && PathPrefix(`/sabnzbd`)  # Define the HTTP router rule based on the domain
+      - traefik.http.routers.sabnzbd.service=sabnzbd-service # Define the service name
+      - traefik.http.routers.sabnzbd.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # Use the defined certificate resolver
+      - traefik.http.routers.sabnzbd.middlewares=rateLimitMiddleware@file,authelia@file
+      - traefik.http.services.sabnzbd-service.loadbalancer.server.port=8080 # Define the service port    
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/sabnzbd:/config # Mount the SABnzbd configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
@@ -141,11 +142,27 @@ services:
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
       - WEBUI_PORT=8090 # Port for the qBittorrent web interface
+    labels:
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.qbittorrent.service=qbittorrent-service # Define the service name
+      - traefik.http.routers.qbittorrent.entrypoints=websecure
+      - traefik.http.routers.qbittorrent.rule=Host(`${DOMAIN}`) && PathPrefix(`/qbittorrent`)
+      - traefik.http.routers.qbittorrent.tls=true
+      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
+      - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file
+      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.regex=^(.*)/qbittorrent$$
+      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.replacement=$$1/qbittorrent/
+      - traefik.http.middlewares.qbittorrent-strip.stripprefix.prefixes=/qbittorrent/
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.X-Frame-Options=SAMEORIGIN
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Referer=
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Origin=
+      - traefik.http.routers.qbittorrent.middlewares=qbittorrent-redirect,qbittorrent-strip,qbittorrent-headers
+      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=8090
+      - traefik.http.services.qbittorrent-service.loadbalancer.passhostheader=false    
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/qbittorrent:/config # Mount the qBittorrent configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
     network_mode: "service:gluetun" # Use the Gluetun container's network, routing qBittorrent traffic through the VPN tunnel
-
 ### MEDIA MANAGERS
   prowlarr: # A meta-indexer and search aggregator for Usenet and torrent indexers, simplifying the integration between indexers and media managers like Sonarr, Radarr, and Lidarr.
     image: ghcr.io/linuxserver/prowlarr:latest # The Prowlarr Docker image from the LinuxServer.io repository
@@ -165,6 +182,7 @@ services:
       - traefik.http.routers.prowlarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/prowlarr`) # Define the routing rule for Prowlarr based on the domain
       - traefik.http.routers.prowlarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.routers.prowlarr.middlewares=rateLimitMiddleware@file,authelia@file
       - traefik.http.services.prowlarr.loadbalancer.server.port=9696 # Define the port for the Prowlarr service
     restart: unless-stopped # Restart policy for the container
   radarr: # A movie library manager that automates the process of searching for, downloading, and organizing movies from Usenet and torrent sources.
@@ -185,6 +203,7 @@ services:
       - traefik.http.routers.radarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/radarr`) # Define the routing rule for Radarr based on the domain
       - traefik.http.routers.radarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.radarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.routers.radarr.middlewares=rateLimitMiddleware@file,authelia@file
       - traefik.http.services.radarr.loadbalancer.server.port=7878 # Define the port for the Radarr service  
   sonarr: # A TV show library manager that automates the process of searching for, downloading, and organizing TV shows from Usenet and torrent sources.
     image: ghcr.io/linuxserver/sonarr # The Sonarr Docker image from the LinuxServer.io repository
@@ -204,6 +223,7 @@ services:
       - traefik.http.routers.sonarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/sonarr`)  # Define the HTTP router rule based on the domain
       - traefik.http.routers.sonarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.sonarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.routers.sonarr.middlewares=rateLimitMiddleware@file,authelia@file
       - traefik.http.services.sonarr.loadbalancer.server.port=8989 # Define the port for the Sonarr service
   lidarr: # A music library manager that automates the process of searching for, downloading, and organizing music albums from Usenet and torrent sources.
     image: ghcr.io/linuxserver/lidarr # The Lidarr Docker image from the LinuxServer.io repository
@@ -223,6 +243,7 @@ services:
       - traefik.http.routers.lidarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/lidarr`) # Define the routing rule for Lidarr based on the domain
       - traefik.http.routers.lidarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.lidarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.routers.lidarr.middlewares=rateLimitMiddleware@file,authelia@file
       - traefik.http.services.lidarr.loadbalancer.server.port=8686 # Define the port for the Lidarr service
   bazarr:
     image: ghcr.io/linuxserver/bazarr
@@ -242,6 +263,7 @@ services:
       - traefik.http.routers.bazarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/bazarr`)
       - traefik.http.routers.bazarr.entrypoints=websecure
       - traefik.http.routers.bazarr.tls.certresolver=myresolver
+      - traefik.http.routers.bazarr.middlewares=rateLimitMiddleware@file,authelia@file
       - traefik.http.services.bazarr.loadbalancer.server.port=6767
     restart: unless-stopped
 ### WEB FRONTENDS
@@ -267,6 +289,7 @@ services:
       - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.heimdall.loadbalancer.server.port=80
+      - traefik.http.routers.heimdall.middlewares=rateLimitMiddleware@file,authelia@file
   ombi: # A web application that gives Plex or Emby users the ability to request content
     image: linuxserver/ombi # The Ombi Docker image from the LinuxServer.io repository
     container_name: ombi # The name of the container
@@ -286,8 +309,8 @@ services:
       - traefik.http.routers.ombi.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.ombi.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.ombi.loadbalancer.server.port=3579 # Define the port for the Ombi service
+      - traefik.http.routers.ombi.middlewares=rateLimitMiddleware@file
     restart: unless-stopped # Policy for automatically restarting the container
-
 ### MEDIA PLAYERS
   plex:
     image: ghcr.io/linuxserver/plex
@@ -310,7 +333,6 @@ services:
     devices:
       - "/dev/dri:/dev/dri"
     restart: unless-stopped
-
 ### OTHER MANAGEMENT TOOLS
   tautulli:
     image: ghcr.io/linuxserver/tautulli
