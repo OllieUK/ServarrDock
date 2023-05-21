@@ -107,9 +107,8 @@ services:
       - "traefik.http.services.authelia.loadbalancer.server.port=9091" # Authelia's internal port that needs to be exposed to the network
       - "traefik.http.routers.authelia.middlewares=rateLimitMiddleware@file"
     networks:
-      my-network: # The custom network, Authelia needs to be on the same network as Traefik for routing to work
-
-### DOWNLOAD CLIENTS
+      - my-network # The custom network, Authelia needs to be on the same network as Traefik for routing to work
+### DOWNLOAD CLIENTS  
   sabnzbd:  # A Usenet binary newsreader that automates the process of downloading and decoding binary files from Usenet newsgroups.
     image: ghcr.io/linuxserver/sabnzbd # The SABnzbd Docker image from the LinuxServer.io repository
     container_name: sabnzbd # The name of the container
@@ -122,7 +121,7 @@ services:
       - SABNZDB_HOST=0.0.0.0 # Bind the SABnzbd service to all available network interfaces
     labels:
       - traefik.enable=true # Enable Traefik for this container    
-      - traefik.http.routers.sabnzbd.rule=Host(`${DOMAIN}`) && PathPrefix(`/sabnzbd`)  # Define the HTTP router rule based on the domain
+      - traefik.http.routers.sabnzbd.rule=Host(`download.${DOMAIN}`) && PathPrefix(`/sabnzbd`)  # Define the HTTP router rule based on the domain
       - traefik.http.routers.sabnzbd.service=sabnzbd-service # Define the service name
       - traefik.http.routers.sabnzbd.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # Use the defined certificate resolver
@@ -146,7 +145,7 @@ services:
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.qbittorrent.service=qbittorrent-service # Define the service name
       - traefik.http.routers.qbittorrent.entrypoints=websecure
-      - traefik.http.routers.qbittorrent.rule=Host(`${DOMAIN}`) && PathPrefix(`/qbittorrent`)
+      - traefik.http.routers.qbittorrent.rule=Host(`download.${DOMAIN}`) && PathPrefix(`/qbittorrent`)
       - traefik.http.routers.qbittorrent.tls=true
       - traefik.http.routers.qbittorrent.tls.certresolver=myresolver
       - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file
@@ -179,7 +178,7 @@ services:
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.prowlarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/prowlarr`) # Define the routing rule for Prowlarr based on the domain
+      - traefik.http.routers.prowlarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/prowlarr`) # Define the routing rule for Prowlarr based on the domain
       - traefik.http.routers.prowlarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.routers.prowlarr.middlewares=rateLimitMiddleware@file,authelia@file
@@ -200,7 +199,7 @@ services:
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.radarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/radarr`) # Define the routing rule for Radarr based on the domain
+      - traefik.http.routers.radarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/radarr`) # Define the routing rule for Radarr based on the domain
       - traefik.http.routers.radarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.radarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.routers.radarr.middlewares=rateLimitMiddleware@file,authelia@file
@@ -220,7 +219,7 @@ services:
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.sonarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/sonarr`)  # Define the HTTP router rule based on the domain
+      - traefik.http.routers.sonarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/sonarr`)  # Define the HTTP router rule based on the domain
       - traefik.http.routers.sonarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.sonarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.routers.sonarr.middlewares=rateLimitMiddleware@file,authelia@file
@@ -240,7 +239,7 @@ services:
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.lidarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/lidarr`) # Define the routing rule for Lidarr based on the domain
+      - traefik.http.routers.lidarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/lidarr`) # Define the routing rule for Lidarr based on the domain
       - traefik.http.routers.lidarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.lidarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.routers.lidarr.middlewares=rateLimitMiddleware@file,authelia@file
@@ -260,7 +259,7 @@ services:
     network_mode: "service:gluetun"
     labels:
       - traefik.enable=true
-      - traefik.http.routers.bazarr.rule=Host(`${DOMAIN}`) && PathPrefix(`/bazarr`)
+      - traefik.http.routers.bazarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/bazarr`)
       - traefik.http.routers.bazarr.entrypoints=websecure
       - traefik.http.routers.bazarr.tls.certresolver=myresolver
       - traefik.http.routers.bazarr.middlewares=rateLimitMiddleware@file,authelia@file
