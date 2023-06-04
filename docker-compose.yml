@@ -66,17 +66,19 @@ services:
     networks: # Connect the container to the specified network
       my-network: # The custom network
       home-macvlan:
-        ipv4_address: 192.168.15.249
+        ipv4_address: ${NET_IP4_TRAEFIK}
   gluetun:  # A VPN client container that supports multiple VPN providers, allowing your other containers to route their traffic through a secure VPN tunnel.
-    image: qmcgaw/gluetun:latest # The Gluetun Docker image (latest version)
+    # image: qmcgaw/gluetun:latest # The Gluetun Docker image (latest version)
+    image: qmcgaw/gluetun:v3.34 # The Gluetun Docker image (3.34 - workaround)
     container_name: gluetun # The name of the container
     devices:
       - /dev/net/tun:/dev/net/tun # Mount the TUN device for VPN tunneling
     environment: # Environment variables for the container
-      - VPNSP=${VPNSP} # VPN service provider
+      - VPN_SERVICE_PROVIDER=${VPNSP} # VPN service provider
       - OPENVPN_USER=${OPENVPN_USER} # VPN username
       - OPENVPN_PASSWORD=${OPENVPN_PASSWORD} # VPN password
-      - REGION=${VPN_REGION} # VPN server region
+      # - SERVER_REGIONS=${VPN_REGION} # VPN server region
+      - SERVER_CITIES=${VPN_CITIES} # VPN server cities - workaround
       - TZ=${TZ} # Time zone
     cap_add:
       - NET_ADMIN # Grant the container network administration capabilities
@@ -278,7 +280,7 @@ services:
     networks:
       my-network:
       # home-macvlan: # Connect the container to the home-macvlan network
-      #   ipv4_address: 192.168.15.248
+      #   ipv4_address: ${NET_IP4_HEIMDALL}
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.heimdall-http.rule=Host(`${DOMAIN}`) # Define the HTTP router rule for home.carr-it.net
@@ -301,7 +303,7 @@ services:
     networks:
       my-network:
       home-macvlan:
-        ipv4_address: 192.168.15.250
+        ipv4_address: ${NET_IP4_OMBI}
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.ombi.rule=Host(`${DOMAIN}`) && PathPrefix(`/ombi`) # Use the websecure entrypoint
