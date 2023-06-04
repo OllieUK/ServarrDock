@@ -329,7 +329,7 @@ services:
       - ${MEDIA_PATH}:/media
     networks:
       home-macvlan:
-        ipv4_address: 192.168.15.253
+        ipv4_address: ${NET_IP4_PLEX}
     # Uncomment the lines below for Intel GPU hardware acceleration
     devices:
       - "/dev/dri:/dev/dri"
