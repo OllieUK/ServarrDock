@@ -109,6 +109,23 @@ services:
       - "traefik.http.routers.authelia.middlewares=rateLimitMiddleware@file"
     networks:
       - my-network # The custom network, Authelia needs to be on the same network as Traefik for routing to work
+  pihole: # Service name for Pi-Hole
+    image: pihole/pihole:latest # Use the latest Pi-Hole Docker image
+    container_name: pihole # Custom name for the Pi-Hole container
+    environment: 
+      TZ: ${TZ} # Use the time zone environment variable from your .env file
+      WEBPASSWORD: ${PIHOLE_WEBPASSWORD} # Admin password for the Pi-Hole web interface, defined in your .env file
+      ServerIP: ${PIHOLE_IP4_ADDR} # Static IP for Pi-Hole, specified in your .env file
+    volumes: 
+      - ${CONFIG_PATH}/pihole/etc-pihole:/etc/pihole # Volume for Pi-Hole configuration persistence, using CONFIG_PATH from .env
+      - ${CONFIG_PATH}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d # Volume for DNS settings persistence, using CONFIG_PATH from .env
+    cap_add: 
+      - NET_ADMIN # Necessary capability for network management
+    networks: 
+      home-macvlan: # Use the existing MACVLAN network defined in your docker-compose file
+        ipv4_address: ${PIHOLE_IP4_ADDR} # Assigning the fixed IP address from .env file to Pi-Hole
+    restart: unless-stopped # Restart policy for the container
+
 ### DOWNLOAD CLIENTS  
   sabnzbd:  # A Usenet binary newsreader that automates the process of downloading and decoding binary files from Usenet newsgroups.
     image: ghcr.io/linuxserver/sabnzbd # The SABnzbd Docker image from the LinuxServer.io repository
@@ -204,7 +221,7 @@ services:
       - traefik.http.routers.radarr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.radarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.routers.radarr.middlewares=rateLimitMiddleware@file,authelia@file
-      - traefik.http.services.radarr.loadbalancer.server.port=7878 # Define the port for the Radarr service  
+      - traefik.http.services.radarr.loadbalancer.server.port=7878 # Define the port for the Radarr service
   sonarr: # A TV show library manager that automates the process of searching for, downloading, and organizing TV shows from Usenet and torrent sources.
     image: ghcr.io/linuxserver/sonarr # The Sonarr Docker image from the LinuxServer.io repository
     container_name: sonarr # The name of the container
@@ -218,13 +235,14 @@ services:
       - ${CONFIG_PATH}/sonarr:/config # Mount the Sonarr configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded TV shows
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.sonarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/sonarr`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.sonarr.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.sonarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.routers.sonarr.middlewares=rateLimitMiddleware@file,authelia@file
-      - traefik.http.services.sonarr.loadbalancer.server.port=8989 # Define the port for the Sonarr service
+    labels:
+      - traefik.enable=true # Enable Traefik for the Sonarr container
+      - traefik.http.routers.sonarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/sonarr`) # Define a router for access through Authelia
+      - traefik.http.routers.sonarr.entrypoints=websecure # Set HTTPS as the entrypoint for sonarr
+      - traefik.http.routers.sonarr.tls=true # Enable TLS
+      - traefik.http.routers.sonarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting and Authelia middleware
+      - traefik.http.routers.sonarr.service=sonarr-service # Link the router to the Sonarr service
+      - traefik.http.services.sonarr-service.loadbalancer.server.port=8989 # Define the internal port for Sonarr service
   lidarr: # A music library manager that automates the process of searching for, downloading, and organizing music albums from Usenet and torrent sources.
     image: ghcr.io/linuxserver/lidarr # The Lidarr Docker image from the LinuxServer.io repository
     container_name: lidarr # The name of the container
@@ -321,8 +339,8 @@ services:
       - TZ=${TZ}
       - PLEX_CLAIM=${PLEX_CLAIM}
       # Uncomment the lines below for NVIDIA or Intel GPU hardware acceleration
-      # - NVIDIA_VISIBLE_DEVICES=all
-      # - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
     volumes:
       - ${CONFIG_PATH}/plex:/config
       - ${MEDIA_PATH}:/media
@@ -332,6 +350,9 @@ services:
     # Uncomment the lines below for Intel GPU hardware acceleration
     devices:
       - "/dev/dri:/dev/dri"
+      - "/dev/nvidia0:/dev/nvidia0"
+      - "/dev/nvidiactl:/dev/nvidiactl"
+      - "/dev/nvidia-uvm:/dev/nvidia-uvm"
     restart: unless-stopped
 ### OTHER MANAGEMENT TOOLS
   tautulli:
