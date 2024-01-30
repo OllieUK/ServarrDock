@@ -16,14 +16,19 @@ This guide will walk you through the installation and configuration process for 
 4. Create a file named `acme.json` in the `./config/traefik` directory to store your SSL certificates, and set its permissions to 600: `chmod 600 acme.json`.
 5. Run `docker-compose up -d` to start the services.
 6. Set up Plex so it can communicate with the outside world. This is called 'port forwarding' and you might also need to add extra port mappings (see the section below).
-7. Configure and set up each service according to the order specified below:
-   - Media managers (Sonarr, Radarr, Lidarr)
-   - Downloaders (SABnzbd, qBittorrent)
-   - Gluetun
-   - Prowlarr
-   - Plex
-   - Ombi (requires media managers and Plex to be running)
-   - Heimdall
+7. **Configure and Set Up Each Service**:
+   Configure each service according to the order specified below. For services that are accessed through Traefik with a URL prefix, such as `/radarr` for Radarr or `/sabnzbd` for SABnzbd, you must set the URL Base within each application's settings to match this prefix. This configuration is typically found in the application's web interface under settings. In some cases, it may be necessary to directly modify the application's configuration files, which are located in the container's config location as specified in the `.env` file.
+
+   - **Media Managers (Sonarr, Radarr, Lidarr):**
+     Ensure that the URL Base in each media manager is set to match the URL Prefix used in Traefik (e.g., `/sonarr`, `/radarr`, `/lidarr`).
+   - **Downloaders (SABnzbd, qBittorrent):**
+     Set the URL Base in SABnzbd and qBittorrent to correspond with the Traefik URL Prefix (e.g., `/sabnzbd` for SABnzbd).
+   - **Gluetun, Prowlarr, Plex:**
+     Follow standard setup procedures as these services typically do not require a URL Base setting.
+   - **Ombi:**
+     Configure Ombi after setting up media managers and Plex. Ensure Ombi is aware of the URL Base or prefixes if accessed through Traefik.
+   - **Heimdall:**
+     Set up Heimdall as your dashboard to access all services from a central location.
 8. Once all services are up and running, configure the inter-service connections using their API keys and endpoints.
 
 ## Plex Port Forwarding and Extra Port Mappings
