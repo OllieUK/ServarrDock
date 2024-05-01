@@ -35,7 +35,7 @@ services:
       - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare" # Set Cloudflare as the DNS provider
       - "--certificatesresolvers.myresolver.acme.email=${CF_API_EMAIL}" # Set the email for Let's Encrypt registration
       - "--certificatesresolvers.myresolver.acme.storage=/acme.json" # Define the storage file for ACME certificates
-      - "--certificatesResolvers.myresolver.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53" # Set the DNS resolvers for the DNS challenge
+      - "--certificatesResolvers.myresolver.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53" # Set the DNS resolvers for the DNS challenge
       # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory" # (Optional) Use the Let's Encrypt staging server for testing
       - "--api.dashboard=true" # Enable the Traefik dashboard
       - "--providers.file.filename=/dynamic.yml"
@@ -344,6 +344,7 @@ services:
     volumes:
       - ${CONFIG_PATH}/plex:/config
       - ${MEDIA_PATH}:/media
+      - /tmp/plex:/transcode
     networks:
       home-macvlan:
         ipv4_address: ${NET_IP4_PLEX}
