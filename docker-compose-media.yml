@@ -1,6 +1,6 @@
 
 # ServarrDock: A self-hosted media management and automation system composed of various services.
-# It includes downloaders, media library managers, and a dashboard.
+# It includes downloaders, and media library managers.
 # The downloaders are secured through a VPN service to maintain privacy.
 # NOTE: This builds on an infrastructure defined in the docker-compose-infra.yml file
 
@@ -189,92 +189,6 @@ services:
       - traefik.http.routers.bazarr.tls.certresolver=myresolver
       - traefik.http.routers.bazarr.middlewares=rateLimitMiddleware@file,authelia@file
       - traefik.http.services.bazarr.loadbalancer.server.port=6767
-    restart: unless-stopped
-### WEB FRONTENDS
-  heimdall: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
-    image: ghcr.io/linuxserver/heimdall # The Heimdall Docker image from the LinuxServer.io repository
-    container_name: heimdall # The name of the container
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/heimdall:/config # Mount the Heimdall configuration directory
-    networks:
-      my-network:
-      # home-macvlan: # Connect the container to the home-macvlan network
-      #   ipv4_address: ${NET_IP4_HEIMDALL}
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.heimdall-http.rule=Host(`${DOMAIN}`) # Define the HTTP router rule for home.carr-it.net
-      - traefik.http.routers.heimdall-http.entrypoints=web # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.heimdall-http.middlewares=redirect-to-https # Apply the 'redirect-to-https' middleware to the HTTP router
-      - traefik.http.routers.heimdall.rule=Host(`${DOMAIN}`) # Define the routing rule for home.carr-it.net
-      - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.services.heimdall.loadbalancer.server.port=80
-      - traefik.http.routers.heimdall.middlewares=rateLimitMiddleware@file,authelia@file
-  ombi: # A web application that gives Plex or Emby users the ability to request content
-    image: linuxserver/ombi # The Ombi Docker image from the LinuxServer.io repository
-    container_name: ombi # The name of the container
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/ombi:/config # Mount the Ombi configuration directory
-    networks:
-      my-network:
-      home-macvlan:
-        ipv4_address: ${NET_IP4_OMBI}
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.ombi.rule=Host(`${DOMAIN}`) && PathPrefix(`/ombi`) # Use the websecure entrypoint
-      - traefik.http.routers.ombi.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.ombi.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.services.ombi.loadbalancer.server.port=3579 # Define the port for the Ombi service
-      - traefik.http.routers.ombi.middlewares=rateLimitMiddleware@file
-    restart: unless-stopped # Policy for automatically restarting the container
-### MEDIA PLAYERS
-  plex:
-    image: ghcr.io/linuxserver/plex
-    container_name: plex
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - PLEX_CLAIM=${PLEX_CLAIM}
-      # Uncomment the lines below for NVIDIA or Intel GPU hardware acceleration
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
-    volumes:
-      - ${CONFIG_PATH}/plex:/config
-      - ${MEDIA_PATH}:/media
-      - /tmp/plex:/transcode
-    networks:
-      home-macvlan:
-        ipv4_address: ${NET_IP4_PLEX}
-    # Uncomment the lines below for Intel GPU hardware acceleration
-    devices:
-      - "/dev/dri:/dev/dri"
-      - "/dev/nvidia0:/dev/nvidia0"
-      - "/dev/nvidiactl:/dev/nvidiactl"
-      - "/dev/nvidia-uvm:/dev/nvidia-uvm"
-    restart: unless-stopped
-### OTHER MANAGEMENT TOOLS
-  tautulli:
-    image: ghcr.io/linuxserver/tautulli
-    container_name: tautulli
-    depends_on:
-      - plex
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    volumes:
-      - ${CONFIG_PATH}/tautulli:/config
-      - ${MEDIA_PATH}:/media
-    network_mode: "service:plex"
     restart: unless-stopped
 
 networks:
