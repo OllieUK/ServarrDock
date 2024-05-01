@@ -4,7 +4,7 @@ ServarrDock is a comprehensive Docker-based solution for self-hosted media manag
 
 ## System Architecture
 
-ServarrDock is now divided into two main parts:
+ServarrDock is structured into three main parts:
 
 ### Infrastructure Services
 Managed by the `docker-compose-infra.yml` file, this includes essential services for network management and security:
@@ -14,11 +14,18 @@ Managed by the `docker-compose-infra.yml` file, this includes essential services
 - **PiHole**: Acts as a network-wide ad blocker and DNS server.
 
 ### Media Services
-Managed by the `docker-compose-media.yml` file, this includes all the media handling services:
-- **Media Managers**: Sonarr, Radarr, Lidarr, Bazarr, and Prowlarr.
-- **Download Clients**: SABnzbd and qBittorrent, secured through a VPN service (Gluetun).
-- **Media Players**: Plex for managing and streaming digital media.
-- **Web Frontends**: Heimdall for application dashboard and Ombi for content request management.
+Managed by the `docker-compose-media.yml` file, this setup handles all media processing tasks:
+- **Downloaders**: SABnzbd and qBittorrent, secured through Gluetun VPN service.
+- **Media Managers**: Sonarr, Radarr, Lidarr, and Bazarr for managing TV shows, movies, and music.
+- **Indexer**: Prowlarr for managing indexers and integrating them with media managers.
+
+### UI Services
+Managed by the `docker-compose-ui.yml` file, this includes user interfaces for media access and management:
+- **Plex**: Manages and streams your digital media.
+- **Tautulli**: Monitors activity and provides statistics about your Plex server.
+- **Heimdall**: Application dashboard for accessing and managing all your services.
+- **Ombi**: Allows users to request media for Plex, managing user requests.
+
 
 ## Services Included
 
@@ -53,7 +60,7 @@ ServarrDock organizes downloads and media in the same volume:
 
 ## Getting Started
 
-To set up and configure ServarrDock, follow the detailed instructions in the [INSTALL.md](./INSTALL.md) file. Setup involves configuring both `docker-compose-infra.yml` and `docker-compose-media.yml` files according to your network and security preferences.
+To set up and configure ServarrDock, follow the detailed instructions in the [INSTALL.md](./INSTALL.md) file. Setup involves configuring the `docker-compose-infra.yml`, `docker-compose-media.yml`, and `docker-compose-ui.yml` files according to your network and security preferences.
 
 After setup, manage your services via the Heimdall dashboard and the domain you have configured.
 
