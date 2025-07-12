@@ -92,6 +92,27 @@ services:
       - ${MEDIA_PATH}:/media
     network_mode: "service:plex"
     restart: unless-stopped
+  audiobookshelf: # A self-hosted server for audiobooks and podcasts.
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_PATH}/audiobookshelf:/config
+      - ${MEDIA_PATH}/audiobooks:/audiobooks
+    networks:
+      home-macvlan:
+        ipv4_address: ${NET_IP4_AUDIOBOOKSHELF}
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.audiobookshelf.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/audiobookshelf`) # Define the routing rule
+      - traefik.http.routers.audiobookshelf.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.audiobookshelf.tls.certresolver=myresolver # Use your certificate resolver
+      - traefik.http.routers.audiobookshelf.middlewares=rateLimitMiddleware@file # Apply your security middlewares
+      - traefik.http.services.audiobookshelf.loadbalancer.server.port=80 # Correct internal port for Audiobookshelf
+    restart: unless-stopped
 
 networks:
   my-network: # Name of the custom network

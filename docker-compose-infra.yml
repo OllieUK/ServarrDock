@@ -17,6 +17,7 @@ services:
       - ${CONFIG_PATH}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d # Persistent storage for DNS settings.
     cap_add:
       - NET_ADMIN # Necessary capability for network management
+      - SYS_NICE # Required for system priority adjustments
     networks: 
       home-macvlan: # Use the existing MACVLAN network defined in your docker-compose file
         ipv4_address: ${PIHOLE_IP4_ADDR} # Assigning the fixed IP address from .env file to Pi-Hole
@@ -89,7 +90,7 @@ services:
     environment:
       - AUTHELIA_JWT_SECRET=${AUTHELIA_JWT_SECRET} # JWT secret used for stateless sessions. This should be a long, randomly generated string
       - AUTHELIA_SESSION_SECRET=${AUTHELIA_SESSION_SECRET} # Session secret used by Authelia for server-side stored sessions. This should also be a long, randomly generated string
-      - AUTHELIA_NOTIFIER_SMTP_PASSWORD=${AUTHELIA_NOTIFIER_SMTP_PASSWORD} # Password for the SMTP server used to send verification emails (assuming you're using SMTP)
+      # - AUTHELIA_NOTIFIER_SMTP_PASSWORD=${AUTHELIA_NOTIFIER_SMTP_PASSWORD} # Password for the SMTP server used to send verification emails (assuming you're using SMTP)
       # Add other necessary environment variables based on your Authelia configuration
     labels:
       - "traefik.enable=true" # Enable Traefik for this container, it makes the Authelia service discoverable by Traefik

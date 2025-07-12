@@ -18,7 +18,8 @@ services:
       - VPN_SERVICE_PROVIDER=${VPNSP} # VPN service provider
       - OPENVPN_USER=${OPENVPN_USER} # VPN username
       - OPENVPN_PASSWORD=${OPENVPN_PASSWORD} # VPN password
-      - SERVER_REGIONS=${VPN_REGION} # VPN server region
+      # - SERVER_REGIONS=${VPN_REGION} # VPN server region
+      - COUNTRY=${VPN_COUNTRY} # VPN server country
       - TZ=${TZ} # Time zone
     cap_add:
       - NET_ADMIN # Grant the container network administration capabilities
