@@ -4,7 +4,6 @@
 # The downloaders are secured through a VPN service to maintain privacy.
 # NOTE: This builds on an infrastructure defined in the docker-compose-infra.yml file
 
-version: '3.8'
 
 services:
 ### NETWORK SERVICES
@@ -170,6 +169,27 @@ services:
       - traefik.http.routers.lidarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.routers.lidarr.middlewares=rateLimitMiddleware@file,authelia@file
       - traefik.http.services.lidarr.loadbalancer.server.port=8686 # Define the port for the Lidarr service
+  readarr: # An audiobook and e-book library manager that automates searching and downloading.
+    image: lscr.io/linuxserver/readarr:0.4.19-nightly # <-- Use the recommended :develop tag
+    container_name: readarr
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_PATH}/readarr:/config
+      - ${MEDIA_PATH}:/media
+    network_mode: "service:gluetun"
+    labels: # Traefik configuration labels
+      - traefik.enable=true
+      - traefik.http.routers.readarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/readarr`)
+      - traefik.http.routers.readarr.entrypoints=websecure
+      - traefik.http.routers.readarr.tls.certresolver=myresolver
+      - traefik.http.routers.readarr.middlewares=rateLimitMiddleware@file,authelia@file
+      - traefik.http.services.readarr.loadbalancer.server.port=8787
+    restart: unless-stopped
   bazarr:
     image: ghcr.io/linuxserver/bazarr
     container_name: bazarr
