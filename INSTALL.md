@@ -1,91 +1,170 @@
-# ServarrDock Installation Guide
+# ServarrDock — Installation Guide
 
-This guide provides detailed instructions on setting up ServarrDock, a comprehensive media management solution organized into separate Docker services for enhanced manageability and security.
+This guide describes how to set up **ServarrDock**, a modular, Docker-based home server environment for media management, home utilities, and supporting infrastructure.
+
+The stack is split into multiple Docker Compose files with clear responsibilities and independent lifecycles.
+
+---
 
 ## Prerequisites
 
-- Docker and Docker Compose installed on your host system.
-- A domain configured with Cloudflare for SSL certificate generation and management.
-- Basic knowledge of Docker networking and volume management.
+- A Linux host with:
+  - Docker Engine
+  - Docker Compose (plugin-based `docker compose`)
+- A domain name (optional but recommended)
+- Basic familiarity with Docker networking and volumes
 
-## Installation Steps
+Optional but assumed in this setup:
+- Cloudflare-managed DNS (for Traefik TLS certificates)
+- A host network interface suitable for macvlan use
 
-### Step 1: Clone the Repository
+---
 
-Clone the ServarrDock repository to your local machine:
+## Repository Setup
 
-```bash
-git clone https://github.com/OllieUK/ServarrDock.git
-cd ServarrDock
-```
+Clone the repository and enter the working directory:
 
-### Step 2: Environment Configuration
+    git clone https://github.com/OllieUK/ServarrDock.git
+    cd ServarrDock/docker
 
-Copy the `.env.example` file to create your environment settings:
+All commands below are assumed to be run from this `docker/` directory.
 
-```bash
-cp .env.example .env
-```
+---
 
-Edit the `.env` file to update it with your specific configurations such as domain names, API keys, and system paths.
+## Environment Configuration
 
-### Step 3: SSL Certificates Setup
+Create and populate the shared environment file:
 
-Create an `acme.json` file in the `./config/traefik` directory for SSL certificates and set its permissions:
+    cp .env.example .env
 
-```bash
-touch ./config/traefik/acme.json
-chmod 600 ./config/traefik/acme.json
-```
+Edit `.env` to define:
 
-### Step 4: Deploy Infrastructure Services
+* paths for persistent configuration and media storage
+* network parameters (subnet, gateway, interface name)
+* domain names and API tokens (where applicable)
 
-Start the core infrastructure services:
+This `.env` file is shared by **all** stacks.
 
-```bash
-docker-compose -f docker-compose-infra.yml up -d
-```
+---
 
-This command launches essential services such as Traefik, PiHole, Watchtower, and Authelia.
+## Traefik TLS Prerequisites (if using HTTPS)
 
-### Step 5: Deploy Media Services
+Create the ACME storage file for Traefik and secure it:
 
-Once the infrastructure is running, deploy the media services:
 
-```bash
-docker-compose -f docker-compose-media.yml up -d
-```
+    mkdir -p ./config/traefik
+    touch ./config/traefik/acme.json
+    chmod 600 ./config/traefik/acme.json
 
-This command starts media-related services including download clients, media managers, and indexing services, all secured through the VPN service.
+Ensure any dynamic Traefik configuration files referenced in the compose files exist.
 
-### Step 6: Deploy UI Services
+---
 
-After setting up the infrastructure and media services, deploy the UI services:
+## Step 1 — Deploy Core DNS & Network Infrastructure
 
-```bash
-docker-compose -f docker-compose-ui.yml up -d
-```
+This stack:
 
-This command initiates user interface services such as Plex, Tautulli, Heimdall, and Ombi, enabling easy access and management of your media.
+* brings up Pi-hole
+* creates the shared Docker networks used by all other stacks
 
-### Step 7: Verify the Setup
+Run:
 
-Ensure that all services are operational by accessing them through the Heimdall dashboard or directly via their configured domains. Check the functionality of each service to confirm proper interconnection and security settings.
+    docker compose up -d
 
-## Configuration Tips
+Verify networks were created:
 
-- **Network Settings**: Ensure that all services are communicating over the correct networks. Services requiring external access should be on `home-macvlan` with appropriate firewall settings configured.
+    docker network ls | egrep 'home-macvlan|my-network'
 
-- **Service Dependencies**: Make sure services that depend on others, like Tautulli depending on Plex, are configured to start after their dependencies are fully operational.
+Nothing else should be started before this step.
 
-- **Security Practices**: Regularly update your `.env` file and Docker configurations to use the latest images and security patches.
+---
+
+## Step 2 — Deploy Edge Services (Ingress & Authentication)
+
+This stack provides external access and authentication.
+
+    docker compose -p edge -f compose.edge.yml up -d
+
+At this point, Traefik and Authelia should be reachable via their configured domains.
+
+---
+
+## Step 3 — Deploy Operations Services
+
+This stack runs background operational tooling.
+
+    docker compose -p ops -f compose.ops.yml up -d
+
+By default, Watchtower will update all containers unless explicitly excluded via labels.
+
+---
+
+## Step 4 — Deploy Media Frontend Services
+
+This stack contains user-facing services such as media servers and dashboards.
+
+    docker compose -p frontend -f compose.frontend.yml up -d
+
+Verify that Plex/Jellyfin and dashboards are reachable through Traefik.
+
+---
+
+## Step 5 — Deploy Media Acquisition & Automation Pipeline
+
+This stack handles downloading, indexing, and automation.
+
+    docker compose -p pipeline -f compose.pipeline.yml up -d
+
+This stack is designed for frequent updates and restarts without impacting user-facing services.
+
+---
+
+## Step 6 — Deploy Home Automation & Utility Services
+
+This stack runs internal household utilities.
+
+    docker compose -p homeauto -f compose.homeauto.yml up -d
+
+---
+
+## Verification
+
+Check that all containers are running and attached to the expected networks:
+
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Networks}}"
+
+Services should resolve each other by **service name** on `my-network`.
+
+---
+
+## Updating and Maintenance
+
+* Individual stacks can be restarted independently.
+* Watchtower manages container updates unless explicitly disabled per service.
+* Infrastructure changes (DNS, networks, ingress) should be performed deliberately and infrequently.
+
+---
 
 ## Troubleshooting
 
-If you encounter issues during setup, check the Docker logs for each container to identify configuration errors or missing dependencies. Additionally, verify that all paths and port configurations in the `.env` and Docker Compose files are correct.
+* Inspect container logs:
 
-For more detailed troubleshooting steps, refer to the documentation for each specific service used within ServarrDock.
+    docker logs <container-name>
 
-## Conclusion
+* Verify network attachment:
 
-By following these steps, you should have a fully operational ServarrDock environment, organized into manageable components for ease of maintenance and scalability. For further customization and support, participate in the community forums or contribute to the ongoing development of ServarrDock.
+    docker inspect <container-name> | grep -A5 Networks
+
+* Ensure `.env` values match your actual host and network environment.
+
+---
+
+## Notes
+
+This setup prioritises:
+
+* clear service boundaries
+* low blast radius
+* operational clarity over convenience shortcuts
+
+It is expected to evolve over time; documentation is updated when structure stabilises.

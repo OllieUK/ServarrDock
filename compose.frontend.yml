@@ -1,0 +1,150 @@
+# UI Services for ServarrDock
+# This compose file handles user interface services to manage and access media content.
+
+name: frontend
+
+services:
+### WEB FRONTENDS
+  heimdall: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
+    image: ghcr.io/linuxserver/heimdall # The Heimdall Docker image from the LinuxServer.io repository
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+    volumes: # Bind mount host volumes to the container
+      - ${CONFIG_PATH}/heimdall:/config # Mount the Heimdall configuration directory
+    networks:
+      my-network:
+      # home-macvlan: # Connect the container to the home-macvlan network
+      #   ipv4_address: ${NET_IP4_HEIMDALL}
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.heimdall-http.rule=Host(`${DOMAIN}`) # Define the HTTP router rule for home.carr-it.net
+      - traefik.http.routers.heimdall-http.entrypoints=web # Use the 'web' entrypoint for the HTTP router
+      - traefik.http.routers.heimdall-http.middlewares=redirect-to-https # Apply the 'redirect-to-https' middleware to the HTTP router
+      - traefik.http.routers.heimdall.rule=Host(`${DOMAIN}`) # Define the routing rule for home.carr-it.net
+      - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.services.heimdall.loadbalancer.server.port=80
+      - traefik.http.routers.heimdall.middlewares=rateLimitMiddleware@file,authelia@file
+  ombi: # A web application that gives Plex or Emby users the ability to request content
+    image: linuxserver/ombi # The Ombi Docker image from the LinuxServer.io repository
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+    volumes: # Bind mount host volumes to the container
+      - ${CONFIG_PATH}/ombi:/config # Mount the Ombi configuration directory
+    networks:
+      my-network:
+      home-macvlan:
+        ipv4_address: ${NET_IP4_OMBI}
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.ombi.rule=Host(`${DOMAIN}`) && PathPrefix(`/ombi`) # Use the websecure entrypoint
+      - traefik.http.routers.ombi.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.ombi.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.services.ombi.loadbalancer.server.port=3579 # Define the port for the Ombi service
+      - traefik.http.routers.ombi.middlewares=rateLimitMiddleware@file
+    restart: unless-stopped # Policy for automatically restarting the container
+### MEDIA PLAYERS
+  plex: # A powerful media server that organizes and streams your media.
+    image: ghcr.io/linuxserver/plex
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - VERSION=docker # Using the Docker version of Plex
+      - PLEX_CLAIM=${PLEX_CLAIM} # Claim token for Plex
+      # Uncomment the lines below for NVIDIA or Intel GPU hardware acceleration
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+    volumes:
+      - ${CONFIG_PATH}/plex:/config
+      - ${MEDIA_PATH}:/media
+      - /tmp/plex:/transcode
+    networks:
+      home-macvlan:
+        ipv4_address: ${NET_IP4_PLEX}
+    # Uncomment the lines below for Intel GPU hardware acceleration
+    devices:
+      - "/dev/dri:/dev/dri"
+      - "/dev/nvidia0:/dev/nvidia0"
+      - "/dev/nvidiactl:/dev/nvidiactl"
+      - "/dev/nvidia-uvm:/dev/nvidia-uvm"
+    restart: unless-stopped
+
+  jellyfin: # An open-source media server, alternative/backup to Plex.
+    image: lscr.io/linuxserver/jellyfin:latest # Jellyfin Docker image from LinuxServer.io
+    environment:
+      - PUID=${PUID} # Run Jellyfin as the same UID as other media services
+      - PGID=${PGID} # Run Jellyfin as the same GID as other media services
+      - TZ=${TZ} # Time zone
+      # Optional: enable NVIDIA GPU hardware acceleration (mirrors Plex setup)
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+    volumes:
+      - ${CONFIG_PATH}/jellyfin:/config # Jellyfin configuration and metadata
+      - ${MEDIA_PATH}:/media # Same media library as Plex
+      - /tmp/jellyfin:/cache # Transcode/cache directory for Jellyfin
+    networks:
+      home-macvlan:
+        ipv4_address: ${NET_IP4_JELLYFIN} # Static IP from DMZ range
+    devices:
+      - "/dev/dri:/dev/dri"
+      - "/dev/nvidia0:/dev/nvidia0"
+      - "/dev/nvidiactl:/dev/nvidiactl"
+      - "/dev/nvidia-uvm:/dev/nvidia-uvm"
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.jellyfin.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/jellyfin`) # Route Jellyfin under /jellyfin
+      - traefik.http.routers.jellyfin.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.jellyfin.tls.certresolver=myresolver # Use your certificate resolver
+      - traefik.http.routers.jellyfin.middlewares=rateLimitMiddleware@file # Apply security middleware (optionally add authelia@file)
+      - traefik.http.services.jellyfin.loadbalancer.server.port=8096 # Internal HTTP port for Jellyfin
+    restart: unless-stopped
+
+### OTHER MANAGEMENT TOOLS
+  tautulli:
+    image: ghcr.io/linuxserver/tautulli
+    depends_on:
+      - plex
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - DOCKER_MODS=linuxserver/mods:universal-package-install
+      - INSTALL_PIP_PACKAGES=plexapi|requests # Python libs for your sync_watch_status.py
+      - PLEXAPI_CONFIG_PATH=/config/plexapi/config.ini # Explicitly set plexapi config path
+    volumes:
+      - ${CONFIG_PATH}/tautulli:/config
+      - ${MEDIA_PATH}:/media
+    network_mode: "service:plex"
+    restart: unless-stopped
+
+  audiobookshelf: # A self-hosted server for audiobooks and podcasts.
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG_PATH}/audiobookshelf:/config
+      - ${MEDIA_PATH}/audiobooks:/audiobooks
+    networks:
+      home-macvlan:
+        ipv4_address: ${NET_IP4_AUDIOBOOKSHELF}
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.audiobookshelf.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/audiobookshelf`) # Define the routing rule
+      - traefik.http.routers.audiobookshelf.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.audiobookshelf.tls.certresolver=myresolver # Use your certificate resolver
+      - traefik.http.routers.audiobookshelf.middlewares=rateLimitMiddleware@file # Apply your security middlewares
+      - traefik.http.services.audiobookshelf.loadbalancer.server.port=80 # Correct internal port for Audiobookshelf
+    restart: unless-stopped
+
+networks:
+  my-network: # Name of the custom network
+    external: true  # Use the existing external network
+  home-macvlan: # Name of the MACVLAN network
+    external: true  # Use the existing external MACVLAN network

@@ -1,71 +1,164 @@
-# ServarrDock: Self-Hosted Media Management and Automation System
+# ServarrDock — Self-Hosted Media & Home Services Stack
 
-ServarrDock is a comprehensive Docker-based solution for self-hosted media management. It integrates a wide range of media-related services, all managed using Docker. Services are segregated into two distinct configurations to enhance manageability and security: one for core network infrastructure and one for media services.
+ServarrDock is a modular, Docker-based home server setup for media management, home utilities, and supporting infrastructure.  
+It is designed around **clear service boundaries**, **low blast radius**, and **independent lifecycles** for different parts of the stack.
 
-## System Architecture
+The environment is intentionally split into multiple Docker Compose stacks, each with a distinct responsibility, while sharing common networks and configuration.
 
-ServarrDock is structured into three main parts:
+---
 
-### Infrastructure Services
-Managed by the `docker-compose-infra.yml` file, this includes essential services for network management and security:
-- **Traefik**: Serves as a reverse proxy and load balancer with built-in support for Cloudflare and Let's Encrypt SSL certificates.
-- **Authelia**: Provides authentication and authorization to protect your services.
-- **Watchtower**: Automatically updates running Docker containers.
-- **PiHole**: Acts as a network-wide ad blocker and DNS server.
+## High-Level Architecture
 
-### Media Services
-Managed by the `docker-compose-media.yml` file, this setup handles all media processing tasks:
-- **Downloaders**: SABnzbd and qBittorrent, secured through Gluetun VPN service.
-- **Media Managers**: Sonarr, Radarr, Lidarr, and Bazarr for managing TV shows, movies, and music.
-- **Indexer**: Prowlarr for managing indexers and integrating them with media managers.
+ServarrDock is organised into several **logical stacks**, each managed by its own Docker Compose file.
 
-### UI Services
-Managed by the `docker-compose-ui.yml` file, this includes user interfaces for media access and management:
-- **Plex**: Manages and streams your digital media.
-- **Tautulli**: Monitors activity and provides statistics about your Plex server.
-- **Heimdall**: Application dashboard for accessing and managing all your services.
-- **Ombi**: Allows users to request media for Plex, managing user requests.
+### Core DNS & Network Infrastructure
+**Purpose:** foundational services required by everything else.
+
+Managed by the root `compose.yml` file.
+
+Includes:
+- **Pi-hole** — network-wide DNS and ad-blocking
+- **Docker networks**
+  - `home-macvlan` (LAN / DMZ-facing services)
+  - `my-network` (internal container-to-container communication)
+
+This stack must be running before any other stack is started.
+
+---
+
+### Edge Services (Ingress & Authentication)
+**Purpose:** secure external access to internal services.
+
+Managed by `compose.edge.yml`.
+
+Includes:
+- **Traefik** — reverse proxy, TLS termination, routing
+- **Authelia** — authentication and access control
+
+This stack depends on the networks created by the Core Infrastructure stack.
+
+---
+
+### Operations Services
+**Purpose:** background maintenance and resilience tooling.
+
+Managed by `compose.ops.yml`.
+
+Includes:
+- **Watchtower** — automated container updates  
+  (updates everything by default unless explicitly excluded via labels)
+
+This stack is intentionally isolated from user-facing services.
+
+---
+
+### Media Frontend Services
+**Purpose:** user-facing media access and dashboards.
+
+Managed by `compose.frontend.yml`.
+
+Includes:
+- **Plex** — media server
+- **Jellyfin** — alternative media server
+- **Tautulli** — Plex monitoring and statistics
+- **Heimdall** — service dashboard
+- **Ombi** — media request management
+- **Audiobookshelf** (if enabled)
+
+These services prioritise **UX stability** and should not be affected by media acquisition restarts.
+
+---
+
+### Media Acquisition & Automation Pipeline
+**Purpose:** downloading, indexing, and media automation.
+
+Managed by `compose.pipeline.yml`.
+
+Includes:
+- **Gluetun** — VPN gateway
+- **SABnzbd**, **qBittorrent** — download clients
+- **Prowlarr**, **Sonarr**, **Radarr**, **Lidarr**, **Bazarr**, etc.
+
+This stack is high-churn by design and can be restarted or updated independently of the frontend.
+
+---
+
+### Home Automation & Utility Services
+**Purpose:** household-facing utilities not directly related to media.
+
+Managed by `compose.homeauto.yml`.
+
+Includes:
+- **Tandoor Recipes**
+- **Withings Sync**
+- Other internal utilities as required
+
+This stack is intentionally independent from both media and network edge services.
+
+---
+
+## Repository Layout (Logical)
+
+docker/
+├── compose.yml                # Core DNS & network infrastructure (Pi-hole, networks)
+├── compose.edge.yml           # Traefik + Authelia
+├── compose.ops.yml            # Watchtower and ops tooling
+├── compose.frontend.yml       # Plex, Jellyfin, dashboards
+├── compose.pipeline.yml       # VPN, downloaders, *arr stack
+├── compose.homeauto.yml       # Home automation & utilities
+├── .env                       # Shared configuration
+└── config/                    # Persistent service configuration
+
+---
+
+## Operating the Stack
+
+### Bring up core infrastructure
+    docker compose up -d
 
 
-## Services Included
+### Bring up additional stacks
 
-### Media Managers
+    docker compose -p edge     -f compose.edge.yml up -d
+    docker compose -p ops      -f compose.ops.yml up -d
+    docker compose -p frontend -f compose.frontend.yml up -d
+    docker compose -p pipeline -f compose.pipeline.yml up -d
+    docker compose -p homeauto -f compose.homeauto.yml up -d
 
-1. [Sonarr](https://sonarr.tv/): A PVR for Usenet and BitTorrent users.
-2. [Radarr](https://radarr.video/): A movie collection manager for Usenet and BitTorrent users.
-3. [Lidarr](https://lidarr.audio/): A music collection manager for Usenet and BitTorrent users.
-4. [Bazarr](https://www.bazarr.media/): A companion program to Sonarr and Radarr that manages and downloads subtitles.
-5. [Prowlarr](https://wiki.servarr.com/Prowlarr): A meta-indexer and search aggregator for Usenet and torrent indexers.
+Stacks can be restarted, updated, or removed independently.
 
-### Download Clients
+---
 
-6. [SABnzbd](https://sabnzbd.org/): A Usenet binary newsreader with a web-based user interface.
-7. [qBittorrent](https://www.qbittorrent.org/): A cross-platform free and open-source BitTorrent client.
+## Networks
 
-### Media Players
+* **home-macvlan**
 
-8. [Plex](https://www.plex.tv/): A platform for managing and streaming digital media.
+  * Used for services that must appear as first-class hosts on the LAN
+* **my-network**
 
-### Web Frontends
+  * Internal Docker bridge for service-to-service communication
 
-9. [Heimdall](https://heimdall.site/): An application dashboard and launcher.
-10. [Ombi](https://ombi.io/): A self-hosted web application that automatically gives your shared Plex or Emby users the ability to request content.
+Networks are **created by the Core Infrastructure stack** and consumed as external networks by all others.
 
-## Folder Structure
-
-ServarrDock organizes downloads and media in the same volume:
-- `downloads/torrent`: For torrent downloads.
-- `downloads/nzb`: For nzb downloads.
-- `media`: Organized into sub-folders for movies, TV shows, and music.
+---
 
 ## Getting Started
 
-To set up and configure ServarrDock, follow the detailed instructions in the [INSTALL.md](./INSTALL.md) file. Setup involves configuring the `docker-compose-infra.yml`, `docker-compose-media.yml`, and `docker-compose-ui.yml` files according to your network and security preferences.
+Initial setup, prerequisites, and first-run instructions are documented in
+[INSTALL.md](./INSTALL.md).
 
-After setup, manage your services via the Heimdall dashboard and the domain you have configured.
+---
 
-## Contributions and Support
+## Philosophy
 
-Contributions are welcome. Please fork the repository and submit a pull request with your enhancements.
+* Prefer **clarity over cleverness**
+* Keep **blast radius small**
+* Separate **user experience**, **automation**, and **infrastructure**
+* Let Docker do what it is good at — no orchestration theatre
 
-For issues and support, please file tickets on the project's GitHub issue tracker.
+---
+
+## Status
+
+This is a living setup, evolved over time for a specific home environment.
+Documentation is updated when architecture stabilises — not before.
