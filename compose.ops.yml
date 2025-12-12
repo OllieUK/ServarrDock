@@ -1,0 +1,22 @@
+# Operations Services
+# This stack provides background maintenance and resilience tooling, kept separate from user-facing services and ingress.
+
+name: ops
+
+services:
+  watchtower: # Automatically monitors and updates running Docker containers when a new image is available.
+    image: containrrr/watchtower
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      WATCHTOWER_CLEANUP: "true" # Removes old images after updating.
+      WATCHTOWER_POLL_INTERVAL: 86400 # Checks for updates every 24 hours (in seconds).
+      # WATCHTOWER_LABEL_ENABLE: "true" # Optional later: switch to opt-in updates via labels.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Allows Watchtower to manage Docker containers.
+    networks:
+      - my-network # Only needed if you later add notification targets reachable via this network.
+
+networks:
+  my-network:
+    external: true

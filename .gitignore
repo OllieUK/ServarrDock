@@ -1,0 +1,28 @@
+# Ignore .env file
+.env
+
+# Ignore temporary files
+*.tmp
+*.bak
+*.swp
+
+# Ignore runtime directories
+/config
+/media
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore node_modules
+node_modules/
+
+# Ignore IDE and editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-
+*.code-workspace
+
+# Ignore acme.json certificates file
+config/traefik/acme.json

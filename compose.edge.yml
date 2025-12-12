@@ -1,0 +1,81 @@
+# Edge & Access Control Services
+# This stack manages external access to internal services, including reverse proxying, TLS certificate handling, and user authentication.
+
+name: edge
+
+services:
+  traefik:  # Traefik: Modern HTTP reverse proxy and load balancer.
+    # Directs incoming requests to appropriate services based on the request details.
+    image: traefik:v3.6.4
+    command:
+      - "--log.level=INFO" # Set log level to DEBUG for detailed logs.
+      - "--providers.docker=true" # Use Docker as the provider for dynamic configuration.
+      - "--providers.docker.exposedbydefault=false" # Prevent automatic exposure of Docker services.
+      - "--entrypoints.web.address=:80" # Define HTTP entrypoint.
+      - "--entrypoints.websecure.address=:443" # Define HTTPS entrypoint.
+      - "--certificatesresolvers.myresolver.acme.dnschallenge=true" # Enable DNS challenge for Let's Encrypt
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare" # Set Cloudflare as the DNS provider
+      - "--certificatesresolvers.myresolver.acme.email=${CF_API_EMAIL}" # Set the email for Let's Encrypt registration
+      - "--certificatesresolvers.myresolver.acme.storage=/acme.json" # Define the storage file for ACME certificates
+      - "--certificatesResolvers.myresolver.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53" # Set the DNS resolvers for the DNS challenge
+      # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory" # (Optional) Use the Let's Encrypt staging server for testing
+      - "--api.dashboard=true" # Enable the Traefik dashboard
+      # - "--providers.file.filename=/dynamic.yml"
+      - "--providers.file.directory=/etc/traefik/dynamic" # Directory for dynamic configuration files
+      - "--providers.file.watch=true" # Watch for changes in the dynamic configuration files
+    ports:
+      - "80:80" # Map HTTP port for external access.
+      - "443:443" # Map HTTPS port for secure external access.
+    environment: # Environment variables for the container
+      - "CF_API_EMAIL=${CF_API_EMAIL}" # Cloudflare API email
+      - "CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}" # Cloudflare DNS API token
+    labels: # Traefik-specific labels for routing and SSL
+      - "traefik.enable=true" # Enable Traefik for this container
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)" # Router rule to match the host
+      - "traefik.http.routers.traefik.entrypoints=websecure" # Use the websecure entrypoint
+      - "traefik.http.routers.traefik.tls.certresolver=myresolver" # Use the defined certificate resolver
+      - "traefik.http.routers.traefik.service=api@internal" # Use the internal Traefik API service
+      - "traefik.http.routers.traefik.tls=true" # Enable TLS
+      - "traefik.http.routers.traefik.tls.domains[0].main=${DOMAIN}" # Define the main domain for TLS
+      - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}" # Define a wildcard subdomain for TLS
+      - "traefik.http.routers.traefik.middlewares=rateLimitMiddleware@file,authelia@file"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"  # Create a middleware named 'redirect-to-https' for HTTP to HTTPS redirection
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"  # Set the redirect as permanent (HTTP 301)
+      - "traefik.http.services.traefik-servarrdock.loadbalancer.server.port=8080" # Traefik dashboard internal port
+      - "com.centurylinklabs.watchtower.enable=false" # Disable Watchtower updates for Traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Allows Traefik to interact with Docker.
+      - ${CONFIG_PATH}/traefik/acme.json:/acme.json # Stores Let's Encrypt certificates.
+      - ${CONFIG_PATH}/traefik/dynamic:/etc/traefik/dynamic # Mount the dynamic config directory
+    networks: # Connect the container to the specified network
+      my-network: # The custom network
+      home-macvlan:
+        ipv4_address: ${NET_IP4_TRAEFIK}
+    restart: unless-stopped # Ensures service restarts if it crashes.
+  authelia: # Authelia: Single Sign-On (SSO) solution for protecting web applications.
+    # Integrates with reverse proxies to secure access with Two-Factor Authentication (2FA) and Single Sign-On.
+    image: authelia/authelia:4.39.15
+    volumes:
+      - ${CONFIG_PATH}/authelia:/config # Store configuration files and user data.
+    environment:
+      - AUTHELIA_JWT_SECRET=${AUTHELIA_JWT_SECRET} # JWT secret used for stateless sessions. This should be a long, randomly generated string
+      - AUTHELIA_SESSION_SECRET=${AUTHELIA_SESSION_SECRET} # Session secret used by Authelia for server-side stored sessions. This should also be a long, randomly generated string
+      # - AUTHELIA_NOTIFIER_SMTP_PASSWORD=${AUTHELIA_NOTIFIER_SMTP_PASSWORD} # Password for the SMTP server used to send verification emails (assuming you're using SMTP)
+      # Add other necessary environment variables based on your Authelia configuration
+    labels:
+      - "traefik.enable=true" # Enable Traefik for this container, it makes the Authelia service discoverable by Traefik
+      - "traefik.http.routers.authelia.rule=Host(`auth.home.carr-it.net`)" # Router rule that matches the domain name of the Authelia service
+      - "traefik.http.routers.authelia.entrypoints=websecure" # Defines the entrypoint for this router, it should be the HTTPS entrypoint
+      - "traefik.http.routers.authelia.tls.certresolver=myresolver" # This tells Traefik to use the previously defined certificate resolver for this service
+      - "traefik.http.services.authelia.loadbalancer.server.port=9091" # Authelia's internal port that needs to be exposed to the network
+      - "traefik.http.routers.authelia.middlewares=rateLimitMiddleware@file" # Apply rate limiting middleware from the file provider
+      - "com.centurylinklabs.watchtower.enable=false" # Disable Watchtower updates for Authelia
+    networks:
+      - my-network # The custom network, Authelia needs to be on the same network as Traefik for routing to work
+    restart: unless-stopped # Ensures service restarts if it crashes.
+
+networks:
+  home-macvlan:
+    external: true
+  my-network:
+    external: true
