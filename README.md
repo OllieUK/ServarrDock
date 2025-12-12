@@ -1,5 +1,9 @@
 # ServarrDock — Self-Hosted Media & Home Services Stack
 
+---
+**WARNING** - This stack is currently being rebuilt and is not stable at this current time.
+---
+
 ServarrDock is a modular, Docker-based home server setup for media management, home utilities, and supporting infrastructure.  
 It is designed around **clear service boundaries**, **low blast radius**, and **independent lifecycles** for different parts of the stack.
 
