@@ -85,32 +85,18 @@ Includes:
 
 This stack is high-churn by design and can be restarted or updated independently of the frontend.
 
----
-
-### Home Automation & Utility Services
-**Purpose:** household-facing utilities not directly related to media.
-
-Managed by `compose.homeauto.yml`.
-
-Includes:
-- **Tandoor Recipes**
-- **Withings Sync**
-- Other internal utilities as required
-
-This stack is intentionally independent from both media and network edge services.
 
 ---
 
 ## Repository Layout (Logical)
 
-docker/
-├── compose.yml                # Core DNS & network infrastructure (Pi-hole, networks)
-├── compose.edge.yml           # Traefik + Authelia
-├── compose.ops.yml            # Watchtower and ops tooling
-├── compose.frontend.yml       # Plex, Jellyfin, dashboards
-├── compose.pipeline.yml       # VPN, downloaders, *arr stack
-├── compose.homeauto.yml       # Home automation & utilities
-├── .env                       # Shared configuration
+docker/ <br>
+├── compose.yml                # Core DNS & network infrastructure (Pi-hole, networks) <br>
+├── compose.edge.yml           # Traefik + Authelia <br>
+├── compose.ops.yml            # Watchtower and ops tooling <br>
+├── compose.frontend.yml       # Plex, Jellyfin, dashboards <br>
+├── compose.pipeline.yml       # VPN, downloaders, *arr stack <br>
+├── .env                       # Shared configuration <br>
 └── config/                    # Persistent service configuration
 
 ---
@@ -127,7 +113,6 @@ docker/
     docker compose -p ops      -f compose.ops.yml up -d
     docker compose -p frontend -f compose.frontend.yml up -d
     docker compose -p pipeline -f compose.pipeline.yml up -d
-    docker compose -p homeauto -f compose.homeauto.yml up -d
 
 Stacks can be restarted, updated, or removed independently.
 

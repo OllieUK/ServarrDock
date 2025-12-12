@@ -119,14 +119,6 @@ This stack is designed for frequent updates and restarts without impacting user-
 
 ---
 
-## Step 6 — Deploy Home Automation & Utility Services
-
-This stack runs internal household utilities.
-
-    docker compose -p homeauto -f compose.homeauto.yml up -d
-
----
-
 ## Verification
 
 Check that all containers are running and attached to the expected networks:
