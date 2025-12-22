@@ -72,6 +72,7 @@ services:
       - "/dev/nvidia0:/dev/nvidia0"
       - "/dev/nvidiactl:/dev/nvidiactl"
       - "/dev/nvidia-uvm:/dev/nvidia-uvm"
+    gpus: all # Enable GPU support
     restart: unless-stopped
 
   jellyfin: # An open-source media server, alternative/backup to Plex.
@@ -86,15 +87,17 @@ services:
     volumes:
       - ${CONFIG_PATH}/jellyfin:/config # Jellyfin configuration and metadata
       - ${MEDIA_PATH}:/media # Same media library as Plex
-      - /tmp/jellyfin:/cache # Transcode/cache directory for Jellyfin
+      - ${TRANSCODE_PATH}/jellyfin:/transcode # Transcode directory on a fast storage medium
+      - ${CACHE_PATH}/jellyfin:/cache # Cache directory for Jellyfin
     networks:
       home-macvlan:
         ipv4_address: ${NET_IP4_JELLYFIN} # Static IP from DMZ range
     devices:
-      - "/dev/dri:/dev/dri"
-      - "/dev/nvidia0:/dev/nvidia0"
-      - "/dev/nvidiactl:/dev/nvidiactl"
-      - "/dev/nvidia-uvm:/dev/nvidia-uvm"
+      # - "/dev/dri:/dev/dri" # Uncomment for Intel GPU hardware acceleration
+      - "/dev/nvidia0:/dev/nvidia0" # NVIDIA GPU device
+      - "/dev/nvidiactl:/dev/nvidiactl" # NVIDIA control device
+      - "/dev/nvidia-uvm:/dev/nvidia-uvm" # NVIDIA UVM device
+    gpus: all # Enable GPU support
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.jellyfin.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/jellyfin`) # Route Jellyfin under /jellyfin
@@ -102,7 +105,7 @@ services:
       - traefik.http.routers.jellyfin.tls.certresolver=myresolver # Use your certificate resolver
       - traefik.http.routers.jellyfin.middlewares=rateLimitMiddleware@file # Apply security middleware (optionally add authelia@file)
       - traefik.http.services.jellyfin.loadbalancer.server.port=8096 # Internal HTTP port for Jellyfin
-    restart: unless-stopped
+    restart: unless-stopped # Restart policy
 
 ### OTHER MANAGEMENT TOOLS
   tautulli:
