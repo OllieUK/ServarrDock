@@ -1,5 +1,8 @@
 # Ignore .env file
 .env
+**/.env
+**/.env.*
+!.env.sample # DON'T ignore the .env.sample file
 
 # Ignore temporary files
 *.tmp
@@ -8,7 +11,9 @@
 
 # Ignore runtime directories
 /config
+**/config/
 /media
+**/media/
 
 # Ignore logs
 logs/
@@ -25,4 +30,5 @@ node_modules/
 *.code-workspace
 
 # Ignore acme.json certificates file
-config/traefik/acme.json
+acme.json
+**/acme.json
