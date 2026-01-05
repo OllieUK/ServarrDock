@@ -66,12 +66,12 @@ services:
       - traefik.http.routers.jellyseerr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.jellyseerr.loadbalancer.server.port=5055 # Define the port for the Jellyseerr service
       - traefik.http.routers.jellyseerr.middlewares=rateLimitMiddleware@file
-#    healthcheck:
-#      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
-#      start_period: 20s
-#      timeout: 3s
-#      interval: 15s
-#      retries: 3
+    # healthcheck:
+    #   test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+    #   start_period: 20s
+    #   timeout: 3s
+    #   interval: 15s
+    #   retries: 3
     restart: unless-stopped # Policy for automatically restarting the container
 
 ### MEDIA PLAYERS
@@ -93,9 +93,23 @@ services:
     networks:
       home-macvlan:
         ipv4_address: ${NET_IP4_PLEX}
-      my-network: # Connect to the my-network network
-    # Uncomment the lines below for Intel GPU hardware acceleration
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+
+      # internal routing
+      - traefik.http.routers.plex-internal.rule=Host(`plex.internal`) # Internal routing rule for Plex
+      - traefik.http.routers.plex-internal.entrypoints=webinternal # Use the webinternal entrypoint
+      - traefik.http.services.plex-internal.loadbalancer.server.port=32400 # Internal port for Plex
+
+      # external
+      - traefik.http.routers.plex.rule=Host(`plex.${DOMAIN}`) # External routing rule for Plex
+      - traefik.http.routers.plex.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.plex.tls.certresolver=myresolver # Use your certificate resolver
+      - traefik.http.routers.plex.middlewares=rateLimitMiddleware@file,authelia@file # Apply security middlewares
+      - traefik.http.services.plex.loadbalancer.server.port=32400 # Internal HTTP port for Plex
+
     devices:
+    # Uncomment the lines below for Intel GPU hardware acceleration
       - "/dev/dri:/dev/dri"
       - "/dev/nvidia0:/dev/nvidia0"
       - "/dev/nvidiactl:/dev/nvidiactl"
