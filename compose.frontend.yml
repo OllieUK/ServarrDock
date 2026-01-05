@@ -59,6 +59,8 @@ services:
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/jellyseerr:/app/config # Mount the Jellyseerr configuration directory
     network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
+    networks:
+      my-network: # Connect the container to the my-network network
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.${DOMAIN}`) # Define the routing rule for jellyseerr.DOMAIN
@@ -150,6 +152,8 @@ services:
       - ${CONFIG_PATH}/tautulli:/config
       - ${MEDIA_PATH}:/media
     network_mode: "service:plex"
+    networks:
+      my-network:
     restart: unless-stopped
 
   audiobookshelf: # A self-hosted server for audiobooks and podcasts.
