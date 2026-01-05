@@ -153,6 +153,27 @@ services:
     network_mode: "service:plex"
     restart: unless-stopped
 
+  suggestarr: # A web application that suggests media content based on your existing library.
+    image: ciuse99/suggestarr:latest
+    container_name: SuggestArr
+    restart: always
+    ports:
+      - "${SUGGESTARR_PORT:-5000}:${SUGGESTARR_PORT:-5000}"
+    volumes:
+      - ${CONFIG_PATH}/suggestarr:/app/config/config_files
+    environment:
+      # Optional: Only needed if something goes wrong and you need to inspect deeper
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Optional: Customize the port (defaults to 5000 if not set)
+      - SUGGESTARR_PORT=${SUGGESTARR_PORT:-5000}
+    labels: # Traefik configuration labels
+      - traefik.enable=true
+      - traefik.http.routers.suggestarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/suggestarr`)
+      - traefik.http.routers.suggestarr.entrypoints=websecure
+      - traefik.http.routers.suggestarr.tls.certresolver=myresolver
+      - traefik.http.routers.suggestarr.middlewares=rateLimitMiddleware@file
+      - traefik.http.services.suggestarr.loadbalancer.server.port=${SUGGESTARR_PORT:-5000}
+
   audiobookshelf: # A self-hosted server for audiobooks and podcasts.
     image: ghcr.io/advplyr/audiobookshelf:latest
     environment:
