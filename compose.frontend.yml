@@ -49,7 +49,7 @@ services:
     restart: unless-stopped # Policy for automatically restarting the container
 
   jellyseerr: # A web application that allows users to request movies and TV shows for Plex.
-    image: ghcr.io/linuxserver/jellyseerr:latest # The Jellyseerr Docker image from the LinuxServer.io repository
+    image: lscr.io/linuxserver/jellyseerr:latest # The Jellyseerr Docker image from the LinuxServer.io repository
     init: true # Use init system to handle process signals and reaping
     environment: # Environment variables for the container
       - PUID=${PUID} # User ID for the container
