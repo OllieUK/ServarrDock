@@ -47,6 +47,34 @@ services:
       - traefik.http.services.ombi.loadbalancer.server.port=3579 # Define the port for the Ombi service
       - traefik.http.routers.ombi.middlewares=rateLimitMiddleware@file
     restart: unless-stopped # Policy for automatically restarting the container
+
+  jellyseerr: # A web application that allows users to request movies and TV shows for Plex.
+    image: ghcr.io/linuxserver/jellyseerr:latest # The Jellyseerr Docker image from the LinuxServer.io repository
+    init: true # Use init system to handle process signals and reaping
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
+      - TZ=${TZ} # Time zone
+      - LOG_LEVEL=debug # Set log level to debug for detailed logging
+    volumes: # Bind mount host volumes to the container
+      - ${CONFIG_PATH}/jellyseerr:/app/config # Mount the Jellyseerr configuration directory
+    networks:
+      my-network:
+    labels: # Traefik configuration labels
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.jellyseerr.rule=Host(`${DOMAIN}`) && PathPrefix(`/jellyseerr`) # Define the routing rule
+      - traefik.http.routers.jellyseerr.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.jellyseerr.tls.certresolver=myresolver # Use the myresolver certificate resolver
+      - traefik.http.services.jellyseerr.loadbalancer.server.port=5055 # Define the port for the Jellyseerr service
+      - traefik.http.routers.jellyseerr.middlewares=rateLimitMiddleware@file
+#    healthcheck:
+#      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+#      start_period: 20s
+#      timeout: 3s
+#      interval: 15s
+#      retries: 3
+    restart: unless-stopped # Policy for automatically restarting the container
+
 ### MEDIA PLAYERS
   plex: # A powerful media server that organizes and streams your media.
     image: ghcr.io/linuxserver/plex
