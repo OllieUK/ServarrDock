@@ -62,7 +62,7 @@ services:
       my-network:
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.${DOMAIN}`) # Define the routing rule for jellyseerr.DOMAIN
+      - traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.media.${DOMAIN}`) # Define the routing rule for jellyseerr.DOMAIN
       - traefik.http.routers.jellyseerr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.jellyseerr.tls.certresolver=myresolver # Use the myresolver certificate resolver
       - traefik.http.services.jellyseerr.loadbalancer.server.port=5055 # Define the port for the Jellyseerr service
