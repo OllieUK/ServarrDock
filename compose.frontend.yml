@@ -58,8 +58,7 @@ services:
       - LOG_LEVEL=debug # Set log level to debug for detailed logging
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/jellyseerr:/app/config # Mount the Jellyseerr configuration directory
-    networks:
-      my-network:
+    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.${DOMAIN}`) # Define the routing rule for jellyseerr.DOMAIN
