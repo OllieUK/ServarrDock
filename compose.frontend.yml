@@ -93,21 +93,20 @@ services:
     networks:
       home-macvlan:
         ipv4_address: ${NET_IP4_PLEX}
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-
-      # internal routing
-      - traefik.http.routers.plex-internal.rule=Host(`plex.internal`) # Internal routing rule for Plex
-      - traefik.http.routers.plex-internal.entrypoints=webinternal # Use the webinternal entrypoint
-      - traefik.http.services.plex-internal.loadbalancer.server.port=32400 # Internal port for Plex
-
-      # external
-      - traefik.http.routers.plex.rule=Host(`plex.${DOMAIN}`) # External routing rule for Plex
-      - traefik.http.routers.plex.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.plex.tls.certresolver=myresolver # Use your certificate resolver
-      - traefik.http.routers.plex.middlewares=rateLimitMiddleware@file,authelia@file # Apply security middlewares
-      - traefik.http.services.plex.loadbalancer.server.port=32400 # Internal HTTP port for Plex
-
+    labels:
+      - traefik.enable=true
+      # INTERNAL (unsecured, LAN-only)
+      - traefik.http.routers.plex_int.rule=Host(`plex.internal`)
+      - traefik.http.routers.plex_int.entrypoints=webinternal
+      - traefik.http.routers.plex_int.service=plex_int_service
+      - traefik.http.services.plex_int_service.loadbalancer.server.port=32400
+      # EXTERNAL (secure, internet + LAN)
+      - traefik.http.routers.plex_ext.rule=Host(`plex.${DOMAIN}`)
+      - traefik.http.routers.plex_ext.entrypoints=websecure
+      - traefik.http.routers.plex_ext.tls.certresolver=myresolver
+      - traefik.http.routers.plex_ext.middlewares=rateLimitMiddleware@file,authelia@file
+      - traefik.http.routers.plex_ext.service=plex_ext_service
+      - traefik.http.services.plex_ext_service.loadbalancer.server.port=32400
     devices:
     # Uncomment the lines below for Intel GPU hardware acceleration
       - "/dev/dri:/dev/dri"
