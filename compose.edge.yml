@@ -10,6 +10,7 @@ services:
     command:
       - "--log.level=INFO" # Set log level to DEBUG for detailed logs.
       - "--providers.docker=true" # Use Docker as the provider for dynamic configuration.
+      - "--providers.docker.network=media-net" # Specify the Docker network to monitor for services.
       - "--providers.docker.exposedbydefault=false" # Prevent automatic exposure of Docker services.
       - "--entrypoints.web.address=:${TRAEFIK_ENTRYPOINT_HTTP_PORT:-80}" # Define HTTP entrypoint. Default to 80 if not set.
       - "--entrypoints.websecure.address=:${TRAEFIK_ENTRYPOINT_HTTPS_PORT:-443}" # Define HTTPS entrypoint. Default to 443 if not set.
@@ -50,8 +51,9 @@ services:
       - ${CONFIG_PATH}/traefik/dynamic:/etc/traefik/dynamic # Mount the dynamic config directory
     networks: # Connect the container to the specified network
       my-network: # The custom network
-      home-macvlan:
+      home-macvlan: # Home macvlan network for direct access to the host network
         ipv4_address: ${NET_IP4_TRAEFIK}
+      media-net: # Media network for access to media services
     restart: unless-stopped # Ensures service restarts if it crashes.
   authelia: # Authelia: Single Sign-On (SSO) solution for protecting web applications.
     # Integrates with reverse proxies to secure access with Two-Factor Authentication (2FA) and Single Sign-On.
@@ -80,3 +82,6 @@ networks:
     external: true
   my-network:
     external: true
+  media-net:
+    external: true
+    name: media-net
