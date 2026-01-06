@@ -1,214 +1,233 @@
+# ServarrDock: Media acquisition and automation pipeline (VPN + *arr services).
+# This compose file contains high-churn services: VPN gateway, download clients, indexer aggregator, and automation tools.
+# Design notes:
+# - Only the services that must reach the public Internet via VPN run in Gluetun's network namespace.
+# - Media managers (*arr, Bazarr, LazyLibrarian) sit on the shared bridge (media-net) and use Docker DNS for inter-service calls.
+# - User access is via Traefik on HTTPS (443/tcp) using host-based routing under *.media.${DOMAIN}.
 
-# ServarrDock: A self-hosted media management and automation system composed of various services.
-# It includes downloaders, and media library managers.
-# The downloaders are secured through a VPN service to maintain privacy.
-# NOTE: This builds on an infrastructure defined in the docker-compose-infra.yml file
-
-name: pipeline
+name: pipeline # Compose project name for this stack
 
 services:
 ### NETWORK SERVICES
-  gluetun:  # A VPN client container that supports multiple VPN providers, allowing your other containers to route their traffic through a secure VPN tunnel.
-    # image: qmcgaw/gluetun:latest # The Gluetun Docker image (latest version)
-    image: qmcgaw/gluetun:v3.34 # The Gluetun Docker image (3.34 - workaround)
-    devices:
-      - /dev/net/tun:/dev/net/tun # Mount the TUN device for VPN tunneling
-    environment: # Environment variables for the container
-      - VPN_SERVICE_PROVIDER=${VPNSP} # VPN service provider
-      - OPENVPN_USER=${OPENVPN_USER} # VPN username
-      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD} # VPN password
-      # - SERVER_REGIONS=${VPN_REGION} # VPN server region
-      - SERVER_COUNTRIES=${VPN_COUNTRY} # VPN server country
+  gluetun: # VPN gateway container used as a shared network namespace for selected services
+    image: qmcgaw/gluetun:v3.34 # Gluetun image (pinned version as a workaround)
+    devices: # Host devices passed through to the container
+      - /dev/net/tun:/dev/net/tun # TUN device required for VPN tunnelling
+    cap_add: # Linux capabilities granted to the container
+      - NET_ADMIN # Required so Gluetun can manage firewall and routing
+    environment: # Environment variables controlling VPN behaviour
+      - VPN_SERVICE_PROVIDER=${VPNSP} # VPN provider identifier (Gluetun)
+      - OPENVPN_USER=${OPENVPN_USER} # OpenVPN username
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD} # OpenVPN password
+      - SERVER_COUNTRIES=${VPN_COUNTRY} # VPN server country selection
       - TZ=${TZ} # Time zone
-    cap_add:
-      - NET_ADMIN # Grant the container network administration capabilities
-    networks:
-      my-network: # Connect the container to the custom network
-
-    labels: # Traefik-specific labels for routing and SSL
+      - FIREWALL_INPUT_PORTS=8080,8090,9696 # Allow inbound to SAB (8080), qBittorrent (8090), and Prowlarr (9696)
+    volumes: # Persistent configuration storage
+      - ${CONFIG_PATH}/gluetun:/gluetun # Gluetun configuration directory
+    networks: # Network attachments for this container
+      media-net: # Attach to the shared media/control-plane bridge for Traefik + Docker DNS
+    labels: # Traefik routing for services running inside the Gluetun namespace
       - traefik.enable=true # Enable Traefik for this container
+      - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Gluetun namespace services
 
+      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.media.${DOMAIN}`) # SABnzbd router rule (host-based)
+      - traefik.http.routers.sabnzbd.entrypoints=websecure # SABnzbd router entrypoint (HTTPS)
+      - traefik.http.routers.sabnzbd.tls=true # Enable TLS for SABnzbd
+      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # SABnzbd certificate resolver
+      - traefik.http.routers.sabnzbd.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to SABnzbd
+      - traefik.http.routers.sabnzbd.service=sabnzbd-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.sabnzbd-svc.loadbalancer.server.port=8080 # SABnzbd internal port inside Gluetun namespace
+
+      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.media.${DOMAIN}`) # qBittorrent router rule (host-based)
+      - traefik.http.routers.qbittorrent.entrypoints=websecure # qBittorrent router entrypoint (HTTPS)
+      - traefik.http.routers.qbittorrent.tls=true # Enable TLS for qBittorrent
+      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # qBittorrent certificate resolver
+      - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to qBittorrent
+      - traefik.http.routers.qbittorrent.service=qbittorrent-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.qbittorrent-svc.loadbalancer.server.port=8090 # qBittorrent WebUI port inside Gluetun namespace
+
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.media.${DOMAIN}`) # Prowlarr router rule (host-based)
+      - traefik.http.routers.prowlarr.entrypoints=websecure # Prowlarr router entrypoint (HTTPS)
+      - traefik.http.routers.prowlarr.tls=true # Enable TLS for Prowlarr
+      - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Prowlarr certificate resolver
+      - traefik.http.routers.prowlarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Prowlarr
+      - traefik.http.routers.prowlarr.service=prowlarr-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696 # Prowlarr internal port inside Gluetun namespace
     restart: unless-stopped # Restart policy
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/gluetun:/gluetun # Mount the Gluetun configuration directory
 
-### DOWNLOAD CLIENTS  
-  sabnzbd:  # A Usenet binary newsreader that automates the process of downloading and decoding binary files from Usenet newsgroups.
-    image: ghcr.io/linuxserver/sabnzbd # The SABnzbd Docker image from the LinuxServer.io repository
-    depends_on:
+### DOWNLOAD CLIENTS (VPN-BOUND)
+  sabnzbd: # Usenet downloader (runs inside Gluetun VPN namespace)
+    image: ghcr.io/linuxserver/sabnzbd # LinuxServer.io SABnzbd image
+    depends_on: # Startup ordering
       - gluetun # Ensure Gluetun starts before SABnzbd
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
+    environment: # Container runtime configuration
+      - PUID=${PUID} # User ID for file ownership
+      - PGID=${PGID} # Group ID for file ownership
       - TZ=${TZ} # Time zone
-      - SABNZDB_HOST=0.0.0.0 # Bind the SABnzbd service to all available network interfaces
-    labels:
-      - traefik.enable=true # Enable Traefik for this container    
-      - traefik.http.routers.sabnzbd.rule=Host(`download.${DOMAIN}`) && PathPrefix(`/sabnzbd`)  # Define the HTTP router rule based on the domain
-      - traefik.http.routers.sabnzbd.service=sabnzbd-service # Define the service name
-      - traefik.http.routers.sabnzbd.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # Use the defined certificate resolver
-      - traefik.http.routers.sabnzbd.middlewares=rateLimitMiddleware@file,authelia@file
-      - traefik.http.services.sabnzbd-service.loadbalancer.server.port=8080 # Define the service port    
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/sabnzbd:/config # Mount the SABnzbd configuration directory
-      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
-    network_mode: "service:gluetun" # Use the Gluetun container's network, routing SABnzbd traffic through the VPN tunnel
-  qbittorrent:  # A lightweight and feature-rich BitTorrent client that enables you to download torrents and manage your torrent files.
-    image: ghcr.io/linuxserver/qbittorrent # The qBittorrent Docker image from the LinuxServer.io repository
-    depends_on:
-      - gluetun # Ensure Gluetun starts before qBittorrent
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-      - WEBUI_PORT=8090 # Port for the qBittorrent web interface
-    labels:
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.qbittorrent.service=qbittorrent-service # Define the service name
-      - traefik.http.routers.qbittorrent.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.qbittorrent.rule=Host(`download.${DOMAIN}`) && PathPrefix(`/qbittorrent`) # Define the HTTP router rule based on the domain
-      - traefik.http.routers.qbittorrent.tls=true # Enable TLS
-      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # Use the defined certificate resolver
-      - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting and Authelia middleware
-      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.regex=^(.*)/qbittorrent$$ # Redirect to add trailing slash
-      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.replacement=$$1/qbittorrent/ # Redirect replacement pattern
-      - traefik.http.middlewares.qbittorrent-strip.stripprefix.prefixes=/qbittorrent/ # Strip /qbittorrent/ prefix
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.X-Frame-Options=SAMEORIGIN # Set X-Frame-Options header
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Referer= # Set Referer header
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Origin= # Set Origin header
-      - traefik.http.routers.qbittorrent.middlewares=qbittorrent-redirect,qbittorrent-strip,qbittorrent-headers # Apply middlewares to the router
-      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=8090 # Define the service port
-      - traefik.http.services.qbittorrent-service.loadbalancer.passhostheader=false # Disable passing the host header
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/qbittorrent:/config # Mount the qBittorrent configuration directory
-      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
-    network_mode: "service:gluetun" # Use the Gluetun container's network, routing qBittorrent traffic through the VPN tunnel
-### MEDIA MANAGERS
-  prowlarr: # A meta-indexer and search aggregator for Usenet and torrent indexers, simplifying the integration between indexers and media managers like Sonarr, Radarr, and Lidarr.
-    image: ghcr.io/linuxserver/prowlarr:latest # The Prowlarr Docker image from the LinuxServer.io repository
-    depends_on:
-      - gluetun # Ensure Gluetun starts before Prowlarr
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/prowlarr:/config # Mount the Prowlarr configuration directory
-      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
-    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.prowlarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/prowlarr`) # Define the routing rule for Prowlarr based on the domain
-      - traefik.http.routers.prowlarr.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.routers.prowlarr.middlewares=rateLimitMiddleware@file,authelia@file
-      - traefik.http.services.prowlarr.loadbalancer.server.port=9696 # Define the port for the Prowlarr service
-    restart: unless-stopped # Restart policy for the container
-  radarr: # A movie library manager that automates the process of searching for, downloading, and organizing movies from Usenet and torrent sources.
-    image: ghcr.io/linuxserver/radarr # The Radarr Docker image from the LinuxServer.io repository
-    depends_on:
-      - gluetun # Ensure Gluetun starts before Radarr
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/radarr:/config # Mount the Radarr configuration directory
-      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded movies
-    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.radarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/radarr`) # Define the routing rule for Radarr based on the domain
-      - traefik.http.routers.radarr.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.radarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.routers.radarr.middlewares=rateLimitMiddleware@file,authelia@file
-      - traefik.http.services.radarr.loadbalancer.server.port=7878 # Define the port for the Radarr service
-  sonarr: # A TV show library manager that automates the process of searching for, downloading, and organizing TV shows from Usenet and torrent sources.
-    image: ghcr.io/linuxserver/sonarr # The Sonarr Docker image from the LinuxServer.io repository
-    depends_on:
-      - gluetun # Ensure Gluetun starts before Sonarr
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/sonarr:/config # Mount the Sonarr configuration directory
-      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded TV shows
-    networks:
-      media-net: # Connect to the media/control-plane network
-    labels:
-      - traefik.enable=true # Enable Traefik for the Sonarr container
-      - traefik.docker.network=media.net # Specify the Docker network for Traefik
-      - traefik.http.routers.sonarr.rule=Host(`sonarr.media.${DOMAIN}`) # Define the routing rule for Sonarr based on the domain
-      - traefik.http.routers.sonarr.entrypoints=websecure # Set HTTPS as the entrypoint for sonarr
-      - traefik.http.routers.sonarr.tls=true # Enable TLS
-      - traefik.http.routers.sonarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting and Authelia middleware
-      - traefik.http.routers.sonarr.service=sonarr-service # Link the router to the Sonarr service
-      - traefik.http.services.sonarr-service.loadbalancer.server.port=8989 # Define the internal port for Sonarr service
-    restart: unless-stopped # Restart policy for the container
-  lidarr: # A music library manager that automates the process of searching for, downloading, and organizing music albums from Usenet and torrent sources.
-    image: ghcr.io/linuxserver/lidarr # The Lidarr Docker image from the LinuxServer.io repository
-    depends_on:
-      - gluetun # Ensure Gluetun starts before Lidarr
-    environment: # Environment variables for the container
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes: # Bind mount host volumes to the container
-      - ${CONFIG_PATH}/lidarr:/config # Mount the Lidarr configuration directory
-      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded music albums
-    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.lidarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/lidarr`) # Define the routing rule for Lidarr based on the domain
-      - traefik.http.routers.lidarr.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.lidarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.routers.lidarr.middlewares=rateLimitMiddleware@file,authelia@file
-      - traefik.http.services.lidarr.loadbalancer.server.port=8686 # Define the port for the Lidarr service
-  lazylibrarian: # A book, magazine, and audiobook manager to automate searching and downloading.
-    image: lscr.io/linuxserver/lazylibrarian:latest # The LazyLibrarian Docker image from the LinuxServer.io repository
-    depends_on:
-      - gluetun # Ensure Gluetun starts before LazyLibrarian
-    environment:
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes:
-      - ${CONFIG_PATH}/lazylibrarian:/config #  Mount the LazyLibrarian configuration directory
-      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded books and audiobooks
-    network_mode: "service:gluetun" # Route all traffic through the Gluetun VPN container.
-    labels: # Traefik configuration labels
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.lazylibrarian.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/lazylibrarian`) # Define the routing rule for LazyLibrarian based on the domain
-      - traefik.http.routers.lazylibrarian.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.lazylibrarian.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.routers.lazylibrarian.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting and Authelia middleware
-      - traefik.http.services.lazylibrarian.loadbalancer.server.port=5299 # Default port for LazyLibrarian
-    restart: unless-stopped # Restart policy for the container
-  bazarr: # A companion application to Sonarr and Radarr that manages and downloads subtitles for your media library.
-    image: ghcr.io/linuxserver/bazarr # The Bazarr Docker image from the LinuxServer.io repository
-    depends_on:
-      - gluetun # Ensure Gluetun starts before Bazarr
-    environment:
-      - PUID=${PUID} # User ID for the container
-      - PGID=${PGID} # Group ID for the container
-      - TZ=${TZ} # Time zone
-    volumes:
-      - ${CONFIG_PATH}/bazarr:/config # Mount the Bazarr configuration directory
-      - ${MEDIA_PATH}:/media # Mount the media directory for accessing media files
-    network_mode: "service:gluetun" # Route all traffic through the Gluetun VPN container.
-    labels:
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.bazarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/bazarr`) # Define the routing rule for Bazarr based on the domain
-      - traefik.http.routers.bazarr.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.bazarr.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.routers.bazarr.middlewares=rateLimitMiddleware@file,authelia@file  # Apply rate limiting and Authelia middleware
-      - traefik.http.services.bazarr.loadbalancer.server.port=6767 # Define the port for the Bazarr service
-    restart: unless-stopped   # Restart policy for the container
+      - SABNZBD_HOST=0.0.0.0 # Bind SABnzbd to all interfaces in the namespace
+    volumes: # Persistent storage and media access
+      - ${CONFIG_PATH}/sabnzbd:/config # SABnzbd configuration directory
+      - ${MEDIA_PATH}:/media # Media directory (downloads and library paths)
+    network_mode: "service:gluetun" # Share Gluetun network namespace (forces SAB traffic via VPN)
+    restart: unless-stopped # Restart policy
 
-networks:
-  my-network: # Name of the custom network
+  qbittorrent: # BitTorrent client (runs inside Gluetun VPN namespace)
+    image: ghcr.io/linuxserver/qbittorrent # LinuxServer.io qBittorrent image
+    depends_on: # Startup ordering
+      - gluetun # Ensure Gluetun starts before qBittorrent
+    environment: # Container runtime configuration
+      - PUID=${PUID} # User ID for file ownership
+      - PGID=${PGID} # Group ID for file ownership
+      - TZ=${TZ} # Time zone
+      - WEBUI_PORT=8090 # qBittorrent WebUI port (must be unique in Gluetun namespace)
+    volumes: # Persistent storage and media access
+      - ${CONFIG_PATH}/qbittorrent:/config # qBittorrent configuration directory
+      - ${MEDIA_PATH}:/media # Media directory (downloads and library paths)
+    network_mode: "service:gluetun" # Share Gluetun network namespace (forces qBit traffic via VPN)
+    restart: unless-stopped # Restart policy
+
+### INDEXER AGGREGATOR (VPN-BOUND)
+  prowlarr: # Indexer manager that brokers indexers for Sonarr/Radarr/Lidarr
+    image: ghcr.io/linuxserver/prowlarr:latest # LinuxServer.io Prowlarr image
+    depends_on: # Startup ordering
+      - gluetun # Ensure Gluetun starts before Prowlarr
+    environment: # Container runtime configuration
+      - PUID=${PUID} # User ID for file ownership
+      - PGID=${PGID} # Group ID for file ownership
+      - TZ=${TZ} # Time zone
+    volumes: # Persistent configuration storage
+      - ${CONFIG_PATH}/prowlarr:/config # Prowlarr configuration directory
+    network_mode: "service:gluetun" # Share Gluetun namespace (optional VPN for indexer queries)
+    restart: unless-stopped # Restart policy
+
+### MEDIA MANAGERS (NON-VPN, BRIDGE + DOCKER DNS)
+  radarr: # Movie library manager and automation service
+    image: ghcr.io/linuxserver/radarr # LinuxServer.io Radarr image
+    depends_on: # Startup ordering
+      - gluetun # Ensure Gluetun (and thus download clients) is up before Radarr starts
+    environment: # Container runtime configuration
+      - PUID=${PUID} # User ID for file ownership
+      - PGID=${PGID} # Group ID for file ownership
+      - TZ=${TZ} # Time zone
+    volumes: # Persistent configuration and media access
+      - ${CONFIG_PATH}/radarr:/config # Radarr configuration directory
+      - ${MEDIA_PATH}:/media # Media directory (downloads and library paths)
+    networks: # Network attachments
+      - media-net # Shared media/control-plane bridge (Traefik + Docker DNS)
+    labels: # Traefik routing labels (host-based)
+      - traefik.enable=true # Enable Traefik for Radarr
+      - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Radarr
+      - traefik.http.routers.radarr.rule=Host(`radarr.media.${DOMAIN}`) # Radarr router rule (host-based)
+      - traefik.http.routers.radarr.entrypoints=websecure # Radarr router entrypoint (HTTPS)
+      - traefik.http.routers.radarr.tls=true # Enable TLS for Radarr
+      - traefik.http.routers.radarr.tls.certresolver=myresolver # Radarr certificate resolver
+      - traefik.http.routers.radarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Radarr
+      - traefik.http.routers.radarr.service=radarr-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.radarr-svc.loadbalancer.server.port=7878 # Radarr internal port
+    restart: unless-stopped # Restart policy
+
+  sonarr: # TV library manager and automation service
+    image: ghcr.io/linuxserver/sonarr # LinuxServer.io Sonarr image
+    depends_on: # Startup ordering
+      - gluetun # Ensure Gluetun (and thus download clients) is up before Sonarr starts
+    environment: # Container runtime configuration
+      - PUID=${PUID} # User ID for file ownership
+      - PGID=${PGID} # Group ID for file ownership
+      - TZ=${TZ} # Time zone
+    volumes: # Persistent configuration and media access
+      - ${CONFIG_PATH}/sonarr:/config # Sonarr configuration directory
+      - ${MEDIA_PATH}:/media # Media directory (downloads and library paths)
+    networks: # Network attachments
+      - media-net # Shared media/control-plane bridge (Traefik + Docker DNS)
+    labels: # Traefik routing labels (host-based)
+      - traefik.enable=true # Enable Traefik for Sonarr
+      - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Sonarr
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.media.${DOMAIN}`) # Sonarr router rule (host-based)
+      - traefik.http.routers.sonarr.entrypoints=websecure # Sonarr router entrypoint (HTTPS)
+      - traefik.http.routers.sonarr.tls=true # Enable TLS for Sonarr
+      - traefik.http.routers.sonarr.tls.certresolver=myresolver # Sonarr certificate resolver
+      - traefik.http.routers.sonarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Sonarr
+      - traefik.http.routers.sonarr.service=sonarr-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.sonarr-svc.loadbalancer.server.port=8989 # Sonarr internal port
+    restart: unless-stopped # Restart policy
+
+  lidarr: # Music library manager and automation service
+    image: ghcr.io/linuxserver/lidarr # LinuxServer.io Lidarr image
+    depends_on: # Startup ordering
+      - gluetun # Ensure Gluetun (and thus download clients) is up before Lidarr starts
+    environment: # Container runtime configuration
+      - PUID=${PUID} # User ID for file ownership
+      - PGID=${PGID} # Group ID for file ownership
+      - TZ=${TZ} # Time zone
+    volumes: # Persistent configuration and media access
+      - ${CONFIG_PATH}/lidarr:/config # Lidarr configuration directory
+      - ${MEDIA_PATH}:/media # Media directory (downloads and library paths)
+    networks: # Network attachments
+      - media-net # Shared media/control-plane bridge (Traefik + Docker DNS)
+    labels: # Traefik routing labels (host-based)
+      - traefik.enable=true # Enable Traefik for Lidarr
+      - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Lidarr
+      - traefik.http.routers.lidarr.rule=Host(`lidarr.media.${DOMAIN}`) # Lidarr router rule (host-based)
+      - traefik.http.routers.lidarr.entrypoints=websecure # Lidarr router entrypoint (HTTPS)
+      - traefik.http.routers.lidarr.tls=true # Enable TLS for Lidarr
+      - traefik.http.routers.lidarr.tls.certresolver=myresolver # Lidarr certificate resolver
+      - traefik.http.routers.lidarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Lidarr
+      - traefik.http.routers.lidarr.service=lidarr-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.lidarr-svc.loadbalancer.server.port=8686 # Lidarr internal port
+    restart: unless-stopped # Restart policy
+
+  lazylibrarian: # Book, magazine, and audiobook manager
+    image: lscr.io/linuxserver/lazylibrarian:latest # LinuxServer.io LazyLibrarian image
+    depends_on: # Startup ordering
+      - gluetun # Ensure Gluetun (and thus download clients) is up before LazyLibrarian starts
+    environment: # Container runtime configuration
+      - PUID=${PUID} # User ID for file ownership
+      - PGID=${PGID} # Group ID for file ownership
+      - TZ=${TZ} # Time zone
+    volumes: # Persistent configuration and media access
+      - ${CONFIG_PATH}/lazylibrarian:/config # LazyLibrarian configuration directory
+      - ${MEDIA_PATH}:/media # Media directory (downloads and library paths)
+    networks: # Network attachments
+      - media-net # Shared media/control-plane bridge (Traefik + Docker DNS)
+    labels: # Traefik routing labels (host-based)
+      - traefik.enable=true # Enable Traefik for LazyLibrarian
+      - traefik.docker.network=media-net # Force Traefik to use media-net when reaching LazyLibrarian
+      - traefik.http.routers.lazylibrarian.rule=Host(`lazylibrarian.media.${DOMAIN}`) # LazyLibrarian router rule (host-based)
+      - traefik.http.routers.lazylibrarian.entrypoints=websecure # LazyLibrarian router entrypoint (HTTPS)
+      - traefik.http.routers.lazylibrarian.tls=true # Enable TLS for LazyLibrarian
+      - traefik.http.routers.lazylibrarian.tls.certresolver=myresolver # LazyLibrarian certificate resolver
+      - traefik.http.routers.lazylibrarian.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to LazyLibrarian
+      - traefik.http.routers.lazylibrarian.service=lazylibrarian-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.lazylibrarian-svc.loadbalancer.server.port=5299 # LazyLibrarian internal port
+    restart: unless-stopped # Restart policy
+
+  bazarr: # Subtitle manager for Sonarr and Radarr
+    image: ghcr.io/linuxserver/bazarr # LinuxServer.io Bazarr image
+    depends_on: # Startup ordering
+      - gluetun # Ensure Gluetun (and thus download clients) is up before Bazarr starts
+    environment: # Container runtime configuration
+      - PUID=${PUID} # User ID for file ownership
+      - PGID=${PGID} # Group ID for file ownership
+      - TZ=${TZ} # Time zone
+    volumes: # Persistent configuration and media access
+      - ${CONFIG_PATH}/bazarr:/config # Bazarr configuration directory
+      - ${MEDIA_PATH}:/media # Media directory (downloads and library paths)
+    networks: # Network attachments
+      - media-net # Shared media/control-plane bridge (Traefik + Docker DNS)
+    labels: # Traefik routing labels (host-based)
+      - traefik.enable=true # Enable Traefik for Bazarr
+      - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Bazarr
+      - traefik.http.routers.bazarr.rule=Host(`bazarr.media.${DOMAIN}`) # Bazarr router rule (host-based)
+      - traefik.http.routers.bazarr.entrypoints=websecure # Bazarr router entrypoint (HTTPS)
+      - traefik.http.routers.bazarr.tls=true # Enable TLS for Bazarr
+      - traefik.http.routers.bazarr.tls.certresolver=myresolver # Bazarr certificate resolver
+      - traefik.http.routers.bazarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Bazarr
+      - traefik.http.routers.bazarr.service=bazarr-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.bazarr-svc.loadbalancer.server.port=6767 # Bazarr internal port
+    restart: unless-stopped # Restart policy
+
+networks: # External networks created/anchored by the infrastructure stack
+  my-network: # General-purpose shared bridge (legacy / non-media stacks)
     external: true # Use the existing external network
-  media-net:
-    external: true # Use the existing external media/control-plane network
+  media-net: # Shared media/control-plane bridge for edge + media stacks (Docker DNS)
+    external: true # Use the existing external network
