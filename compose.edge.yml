@@ -14,7 +14,6 @@ services:
       - "--providers.docker.exposedbydefault=false" # Prevent automatic exposure of Docker services.
       - "--entrypoints.web.address=:${TRAEFIK_ENTRYPOINT_HTTP_PORT:-80}" # Define HTTP entrypoint. Default to 80 if not set.
       - "--entrypoints.websecure.address=:${TRAEFIK_ENTRYPOINT_HTTPS_PORT:-443}" # Define HTTPS entrypoint. Default to 443 if not set.
-      - "--entrypoints.webinternal.address=:${TRAEFIK_ENTRYPOINT_INTERNAL_PORT:-8088}" # Define internal entrypoint for for internal service discovery. Default to 8088 if not set.
       - "--certificatesresolvers.myresolver.acme.dnschallenge=true" # Enable DNS challenge for Let's Encrypt
       - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare" # Set Cloudflare as the DNS provider
       - "--certificatesresolvers.myresolver.acme.email=${CF_API_EMAIL}" # Set the email for Let's Encrypt registration
@@ -43,7 +42,6 @@ services:
       - "traefik.http.routers.traefik.middlewares=rateLimitMiddleware@file,authelia@file"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"  # Create a middleware named 'redirect-to-https' for HTTP to HTTPS redirection
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"  # Set the redirect as permanent (HTTP 301)
-      - "traefik.http.services.traefik-servarrdock.loadbalancer.server.port=8080" # Traefik dashboard internal port
       - "com.centurylinklabs.watchtower.enable=false" # Disable Watchtower updates for Traefik
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Allows Traefik to interact with Docker.
