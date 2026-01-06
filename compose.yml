@@ -4,33 +4,16 @@
 name: infra
 
 services:
-  pihole: # PiHole: Network-wide Ad Blocking and DNS service.
-    # Handles DNS queries and provides ad-blocking at the network level.
-    image: pihole/pihole:2025.11.1
-    environment:
-      TZ: ${TZ} # Time Zone for service logs and timing.
-      WEBPASSWORD: ${PIHOLE_WEBPASSWORD} # Password for the web admin interface.
-      ServerIP: ${PIHOLE_IP4_ADDR} # Static IP for Pi-Hole, specified in your .env file      
-    volumes:
-      - ${CONFIG_PATH}/pihole/etc-pihole:/etc/pihole # Persistent storage for PiHole configurations.
-      - ${CONFIG_PATH}/pihole/etc-dnsmasq.d:/etc/dnsmasq.d # Persistent storage for DNS settings.
-    cap_add:
-      - NET_ADMIN # Necessary capability for network management
-      - SYS_NICE # Required for system priority adjustments
-    labels:
-      - "com.centurylinklabs.watchtower.enable=false" # Disable Watchtower updates for Pi-Hole
-    networks: 
-      home-macvlan: # Use the existing MACVLAN network defined in your docker-compose file
-        ipv4_address: ${PIHOLE_IP4_ADDR} # Assigning the fixed IP address from .env file to Pi-Hole
-    restart: unless-stopped # Ensures service restarts if it crashes.
-
-  net-anchor: # Keeps the internal bridge network created even if no "real" infra service uses it directly.
+  net-anchor:
+    # A tiny container used to "anchor" shared Docker networks so they exist even if
+    # no other stacks are currently attached.
     image: alpine:3.20 # Lightweight Alpine Linux image.
     container_name: net-anchor # Fixed name for easy identification.
     command: ["sh", "-c", "sleep infinity"] # Keeps the container running indefinitely.
     restart: unless-stopped # Ensures service restarts if it crashes.
     networks:
       - my-network # Connects to the internal bridge network to give it a 'home'.
+      - media-net # Connects to the new media/control-plane network.
 
 networks:
   home-macvlan: # Define the MACVLAN network for direct host network access
@@ -45,4 +28,8 @@ networks:
   my-network:
     name: my-network
     driver: bridge # Bridge network for internal service communication
+
+  media-net: # New shared bridge network for the media/control-plane refactor
+    name: media-net
+    driver: bridge
     
