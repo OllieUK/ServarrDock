@@ -11,12 +11,12 @@ The stack is split into multiple Docker Compose files with clear responsibilitie
 - A Linux host with:
   - Docker Engine
   - Docker Compose (plugin-based `docker compose`)
-- A domain name (optional but recommended)
+- A domain name (recommended)
 - Basic familiarity with Docker networking and volumes
 
 Optional but assumed in this setup:
 - Cloudflare-managed DNS (for Traefik TLS certificates)
-- A host network interface suitable for macvlan use
+- Split-horizon DNS (internal resolution to Traefik LAN IP)
 
 ---
 
@@ -40,7 +40,7 @@ Create and populate the shared environment file:
 Edit `.env` to define:
 
 * paths for persistent configuration and media storage
-* network parameters (subnet, gateway, interface name)
+* network parameters (where applicable)
 * domain names and API tokens (where applicable)
 
 This `.env` file is shared by **all** stacks.
@@ -51,7 +51,6 @@ This `.env` file is shared by **all** stacks.
 
 Create the ACME storage file for Traefik and secure it:
 
-
     mkdir -p ./config/traefik
     touch ./config/traefik/acme.json
     chmod 600 ./config/traefik/acme.json
@@ -60,11 +59,25 @@ Ensure any dynamic Traefik configuration files referenced in the compose files e
 
 ---
 
-## Step 1 — Deploy Core DNS & Network Infrastructure
+## DNS Prerequisites (recommended)
+
+This setup assumes host-based routing (subdomains) for services behind Traefik, e.g.
+
+- `sonarr.media.<domain>`
+- `radarr.media.<domain>`
+- `jellyseerr.media.<domain>`
+
+Internal DNS should resolve `*.media.<domain>` to Traefik’s LAN IP (split-horizon).
+
+One implementation pattern:
+- dnsmasq returns Traefik’s LAN IP for that zone (via an `address=/*.media.<domain>/<traefik-ip>` style rule)
+This avoids having to create a DNS host (A) or CNAME entry for every service.
+
+---
+
+## Step 1 — Deploy Core Network Infrastructure
 
 This stack:
-
-* brings up Pi-hole
 * creates the shared Docker networks used by all other stacks
 
 Run:
@@ -73,7 +86,7 @@ Run:
 
 Verify networks were created:
 
-    docker network ls | egrep 'home-macvlan|my-network'
+    docker network ls | egrep 'media-net|my-network'
 
 Nothing else should be started before this step.
 
@@ -105,7 +118,7 @@ This stack contains user-facing services such as media servers and dashboards.
 
     docker compose -p frontend -f compose.frontend.yml up -d
 
-Verify that Plex/Jellyfin and dashboards are reachable through Traefik.
+Verify services are reachable through Traefik using their subdomains.
 
 ---
 
@@ -125,7 +138,7 @@ Check that all containers are running and attached to the expected networks:
 
     docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Networks}}"
 
-Services should resolve each other by **service name** on `my-network`.
+For service-to-service communication, prefer Docker DNS service names on `media-net`, e.g. `http://sonarr:8989`.
 
 ---
 

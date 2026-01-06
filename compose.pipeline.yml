@@ -135,15 +135,18 @@ services:
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/sonarr:/config # Mount the Sonarr configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded TV shows
-    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
+    networks:
+      media-net: # Connect to the media/control-plane network
     labels:
       - traefik.enable=true # Enable Traefik for the Sonarr container
-      - traefik.http.routers.sonarr.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/sonarr`) # Define a router for access through Authelia
+      - traefik.docker.network=media.net # Specify the Docker network for Traefik
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.media.${DOMAIN}`) # Define the routing rule for Sonarr based on the domain
       - traefik.http.routers.sonarr.entrypoints=websecure # Set HTTPS as the entrypoint for sonarr
       - traefik.http.routers.sonarr.tls=true # Enable TLS
       - traefik.http.routers.sonarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting and Authelia middleware
       - traefik.http.routers.sonarr.service=sonarr-service # Link the router to the Sonarr service
       - traefik.http.services.sonarr-service.loadbalancer.server.port=8989 # Define the internal port for Sonarr service
+    restart: unless-stopped # Restart policy for the container
   lidarr: # A music library manager that automates the process of searching for, downloading, and organizing music albums from Usenet and torrent sources.
     image: ghcr.io/linuxserver/lidarr # The Lidarr Docker image from the LinuxServer.io repository
     depends_on:
@@ -207,5 +210,5 @@ services:
 networks:
   my-network: # Name of the custom network
     external: true # Use the existing external network
-  home-macvlan:
-    external: true # Use the existing external MACVLAN network
+  media-net:
+    external: true # Use the existing external media/control-plane network
