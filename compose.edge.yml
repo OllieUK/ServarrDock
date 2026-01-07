@@ -14,6 +14,9 @@ services:
       - "--providers.docker.exposedbydefault=false" # Prevent automatic exposure of Docker services.
       - "--entrypoints.web.address=:${TRAEFIK_ENTRYPOINT_HTTP_PORT:-80}" # Define HTTP entrypoint. Default to 80 if not set.
       - "--entrypoints.websecure.address=:${TRAEFIK_ENTRYPOINT_HTTPS_PORT:-443}" # Define HTTPS entrypoint. Default to 443 if not set.
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure" # Redirect HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https" # Redirect scheme from HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true" # Set the redirect as permanent (HTTP 301)
       - "--certificatesresolvers.myresolver.acme.dnschallenge=true" # Enable DNS challenge for Let's Encrypt
       - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare" # Set Cloudflare as the DNS provider
       - "--certificatesresolvers.myresolver.acme.email=${CF_API_EMAIL}" # Set the email for Let's Encrypt registration
