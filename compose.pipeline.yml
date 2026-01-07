@@ -21,9 +21,11 @@ services:
       - OPENVPN_PASSWORD=${OPENVPN_PASSWORD} # OpenVPN password
       - SERVER_COUNTRIES=${VPN_COUNTRY} # VPN server country selection
       - TZ=${TZ} # Time zone
-      - HTTP_PROXY=on # Enable built-in HTTP proxy (for services that don't support SOCKS5)
-      - SOCKS5_PROXY=on # Enable built-in SOCKS5 proxy      
-      - FIREWALL_INPUT_PORTS=1080,8080,8888,8090 # OpenVPN-allowed inbound ports (proxies + download clients)
+      # Enable Gluetun's built-in HTTP proxy
+      - HTTPPROXY=on           # Turn on the internal HTTP proxy
+      - HTTPPROXY_LISTENING_ADDRESS=:8888 # Listen on port 8888 for HTTP proxy clients
+      # Allow inbound ports through Gluetun's firewall (proxy + download clients)
+      - FIREWALL_INPUT_PORTS=8080,8090,8888,1080
     volumes: # Persistent configuration storage
       - ${CONFIG_PATH}/gluetun:/gluetun # Gluetun configuration directory
     networks: # Network attachments for this container
