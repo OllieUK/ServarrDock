@@ -3,7 +3,7 @@
 # Design notes:
 # - Only the services that must reach the public Internet via VPN run in Gluetun's network namespace.
 # - Media managers (*arr, Bazarr, LazyLibrarian) sit on the shared bridge (media-net) and use Docker DNS for inter-service calls.
-# - User access is via Traefik on HTTPS (443/tcp) using host-based routing under *.media.${DOMAIN}.
+# - User access is via Traefik on HTTPS (443/tcp) using host-based routing under *.${DOMAIN}.
 
 name: pipeline # Compose project name for this stack
 
@@ -35,7 +35,7 @@ services:
       - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Gluetun namespace services
 
       # SABnzbd labels
-      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.media.${DOMAIN}`) # SABnzbd router rule (host-based)
+      - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.${DOMAIN}`) # SABnzbd router rule (host-based)
       - traefik.http.routers.sabnzbd.entrypoints=websecure # SABnzbd router entrypoint (HTTPS)
       - traefik.http.routers.sabnzbd.tls=true # Enable TLS for SABnzbd
       - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # SABnzbd certificate resolver
@@ -44,7 +44,7 @@ services:
       - traefik.http.services.sabnzbd-svc.loadbalancer.server.port=8080 # SABnzbd internal port inside Gluetun namespace
 
       # qBittorrent labels
-      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.media.${DOMAIN}`) # qBittorrent router rule (host-based)
+      - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.${DOMAIN}`) # qBittorrent router rule (host-based)
       - traefik.http.routers.qbittorrent.entrypoints=websecure # qBittorrent router entrypoint (HTTPS)
       - traefik.http.routers.qbittorrent.tls=true # Enable TLS for qBittorrent
       - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # qBittorrent certificate resolver
@@ -100,7 +100,7 @@ services:
     labels:
       - traefik.enable=true # Enable Traefik for this container
       - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Prowlarr 
-      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.media.${DOMAIN}`) # Prowlarr router rule (host-based)
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`) # Prowlarr router rule (host-based)
       - traefik.http.routers.prowlarr.entrypoints=websecure # Prowlarr router entrypoint (HTTPS)
       - traefik.http.routers.prowlarr.tls=true # Enable TLS for Prowlarr
       - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Prowlarr certificate resolver
@@ -126,7 +126,7 @@ services:
     labels: # Traefik routing labels (host-based)
       - traefik.enable=true # Enable Traefik for Radarr
       - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Radarr
-      - traefik.http.routers.radarr.rule=Host(`radarr.media.${DOMAIN}`) # Radarr router rule (host-based)
+      - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`) # Radarr router rule (host-based)
       - traefik.http.routers.radarr.entrypoints=websecure # Radarr router entrypoint (HTTPS)
       - traefik.http.routers.radarr.tls=true # Enable TLS for Radarr
       - traefik.http.routers.radarr.tls.certresolver=myresolver # Radarr certificate resolver
@@ -151,7 +151,7 @@ services:
     labels: # Traefik routing labels (host-based)
       - traefik.enable=true # Enable Traefik for Sonarr
       - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Sonarr
-      - traefik.http.routers.sonarr.rule=Host(`sonarr.media.${DOMAIN}`) # Sonarr router rule (host-based)
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`) # Sonarr router rule (host-based)
       - traefik.http.routers.sonarr.entrypoints=websecure # Sonarr router entrypoint (HTTPS)
       - traefik.http.routers.sonarr.tls=true # Enable TLS for Sonarr
       - traefik.http.routers.sonarr.tls.certresolver=myresolver # Sonarr certificate resolver
@@ -176,7 +176,7 @@ services:
     labels: # Traefik routing labels (host-based)
       - traefik.enable=true # Enable Traefik for Lidarr
       - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Lidarr
-      - traefik.http.routers.lidarr.rule=Host(`lidarr.media.${DOMAIN}`) # Lidarr router rule (host-based)
+      - traefik.http.routers.lidarr.rule=Host(`lidarr.${DOMAIN}`) # Lidarr router rule (host-based)
       - traefik.http.routers.lidarr.entrypoints=websecure # Lidarr router entrypoint (HTTPS)
       - traefik.http.routers.lidarr.tls=true # Enable TLS for Lidarr
       - traefik.http.routers.lidarr.tls.certresolver=myresolver # Lidarr certificate resolver
@@ -201,7 +201,7 @@ services:
     labels: # Traefik routing labels (host-based)
       - traefik.enable=true # Enable Traefik for LazyLibrarian
       - traefik.docker.network=media-net # Force Traefik to use media-net when reaching LazyLibrarian
-      - traefik.http.routers.lazylibrarian.rule=Host(`lazylibrarian.media.${DOMAIN}`) # LazyLibrarian router rule (host-based)
+      - traefik.http.routers.lazylibrarian.rule=Host(`lazylibrarian.${DOMAIN}`) # LazyLibrarian router rule (host-based)
       - traefik.http.routers.lazylibrarian.entrypoints=websecure # LazyLibrarian router entrypoint (HTTPS)
       - traefik.http.routers.lazylibrarian.tls=true # Enable TLS for LazyLibrarian
       - traefik.http.routers.lazylibrarian.tls.certresolver=myresolver # LazyLibrarian certificate resolver
@@ -226,7 +226,7 @@ services:
     labels: # Traefik routing labels (host-based)
       - traefik.enable=true # Enable Traefik for Bazarr
       - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Bazarr
-      - traefik.http.routers.bazarr.rule=Host(`bazarr.media.${DOMAIN}`) # Bazarr router rule (host-based)
+      - traefik.http.routers.bazarr.rule=Host(`bazarr.${DOMAIN}`) # Bazarr router rule (host-based)
       - traefik.http.routers.bazarr.entrypoints=websecure # Bazarr router entrypoint (HTTPS)
       - traefik.http.routers.bazarr.tls=true # Enable TLS for Bazarr
       - traefik.http.routers.bazarr.tls.certresolver=myresolver # Bazarr certificate resolver
