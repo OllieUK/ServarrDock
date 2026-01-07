@@ -21,7 +21,9 @@ services:
       - OPENVPN_PASSWORD=${OPENVPN_PASSWORD} # OpenVPN password
       - SERVER_COUNTRIES=${VPN_COUNTRY} # VPN server country selection
       - TZ=${TZ} # Time zone
-      - FIREWALL_INPUT_PORTS=8080,8090,9696 # Allow inbound to SAB (8080), qBittorrent (8090), and Prowlarr (9696)
+      - HTTP_PROXY=on # Enable built-in HTTP proxy (for services that don't support SOCKS5)
+      - SOCKS5_PROXY=on # Enable built-in SOCKS5 proxy      
+      - FIREWALL_INPUT_PORTS=1080,8080,8888,8090 # OpenVPN-allowed inbound ports (proxies + download clients)
     volumes: # Persistent configuration storage
       - ${CONFIG_PATH}/gluetun:/gluetun # Gluetun configuration directory
     networks: # Network attachments for this container
@@ -30,6 +32,7 @@ services:
       - traefik.enable=true # Enable Traefik for this container
       - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Gluetun namespace services
 
+      # SABnzbd labels
       - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.media.${DOMAIN}`) # SABnzbd router rule (host-based)
       - traefik.http.routers.sabnzbd.entrypoints=websecure # SABnzbd router entrypoint (HTTPS)
       - traefik.http.routers.sabnzbd.tls=true # Enable TLS for SABnzbd
@@ -38,6 +41,7 @@ services:
       - traefik.http.routers.sabnzbd.service=sabnzbd-svc # Explicitly bind router to service name (avoids ambiguity)
       - traefik.http.services.sabnzbd-svc.loadbalancer.server.port=8080 # SABnzbd internal port inside Gluetun namespace
 
+      # qBittorrent labels
       - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.media.${DOMAIN}`) # qBittorrent router rule (host-based)
       - traefik.http.routers.qbittorrent.entrypoints=websecure # qBittorrent router entrypoint (HTTPS)
       - traefik.http.routers.qbittorrent.tls=true # Enable TLS for qBittorrent
@@ -45,14 +49,6 @@ services:
       - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to qBittorrent
       - traefik.http.routers.qbittorrent.service=qbittorrent-svc # Explicitly bind router to service name (avoids ambiguity)
       - traefik.http.services.qbittorrent-svc.loadbalancer.server.port=8090 # qBittorrent WebUI port inside Gluetun namespace
-
-      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.media.${DOMAIN}`) # Prowlarr router rule (host-based)
-      - traefik.http.routers.prowlarr.entrypoints=websecure # Prowlarr router entrypoint (HTTPS)
-      - traefik.http.routers.prowlarr.tls=true # Enable TLS for Prowlarr
-      - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Prowlarr certificate resolver
-      - traefik.http.routers.prowlarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Prowlarr
-      - traefik.http.routers.prowlarr.service=prowlarr-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696 # Prowlarr internal port inside Gluetun namespace
     restart: unless-stopped # Restart policy
 
 ### DOWNLOAD CLIENTS (VPN-BOUND)
@@ -97,7 +93,18 @@ services:
       - TZ=${TZ} # Time zone
     volumes: # Persistent configuration storage
       - ${CONFIG_PATH}/prowlarr:/config # Prowlarr configuration directory
-    network_mode: "service:gluetun" # Share Gluetun namespace (optional VPN for indexer queries)
+    networks: # Network attachments for this container
+      media-net: # Attach to the shared media/control-plane bridge for Traefik + Docker DNS
+    labels:
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Prowlarr 
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.media.${DOMAIN}`) # Prowlarr router rule (host-based)
+      - traefik.http.routers.prowlarr.entrypoints=websecure # Prowlarr router entrypoint (HTTPS)
+      - traefik.http.routers.prowlarr.tls=true # Enable TLS for Prowlarr
+      - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Prowlarr certificate resolver
+      - traefik.http.routers.prowlarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Prowlarr
+      - traefik.http.routers.prowlarr.service=prowlarr-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696 #  Prowlarr internal port
     restart: unless-stopped # Restart policy
 
 ### MEDIA MANAGERS (NON-VPN, BRIDGE + DOCKER DNS)
