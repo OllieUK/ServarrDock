@@ -137,12 +137,12 @@ This avoids dependency on LAN DNS for internal container communications.
 
 ### User-facing ingress (HTTPS)
 User-facing access is host-based routing via Traefik (443/tcp), using subdomains under a shared zone, e.g.
-- `https://sonarr.media.<domain>`
-- `https://radarr.media.<domain>`
-- `https://jellyseerr.media.<domain>`
+- `https://sonarr.<domain>`
+- `https://radarr.<domain>`
+- `https://jellyseerr.<domain>`
 
 Internal DNS is handled via split-horizon:
-- AdGuard forwards queries for `/*.media.<domain>/` to OpenWrt dnsmasq
+- AdGuard forwards queries for `/*.<domain>/` to OpenWrt dnsmasq
 - dnsmasq returns Traefik’s LAN IP for that zone
 
 ---

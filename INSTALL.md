@@ -71,15 +71,15 @@ Ensure any dynamic Traefik configuration files referenced in the compose files e
 
 This setup assumes host-based routing (subdomains) for services behind Traefik, e.g.
 
-* `sonarr.media.<domain>`
-* `radarr.media.<domain>`
-* `jellyseerr.media.<domain>`
+* `sonarr.<domain>`
+* `radarr.<domain>`
+* `jellyseerr.<domain>`
 
-Internal DNS should resolve `*.media.<domain>` to Traefik’s LAN IP (split-horizon).
+Internal DNS should resolve `*.<domain>` to Traefik’s LAN IP (split-horizon).
 
 One implementation pattern:
 
-* dnsmasq returns Traefik’s LAN IP for that zone (via an `address=/*.media.<domain>/<traefik-ip>` style rule)
+* dnsmasq returns Traefik’s LAN IP for that zone (via an `address=/*.<domain>/<traefik-ip>` style rule)
   This avoids having to create a DNS host (A) or CNAME entry for every service.
 
 ---
