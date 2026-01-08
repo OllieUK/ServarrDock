@@ -45,13 +45,22 @@ services:
       - traefik.http.services.sabnzbd-svc.loadbalancer.server.port=8080 # SABnzbd internal port inside Gluetun namespace
 
       # qBittorrent labels
-      - traefik.http.routers.qbittorrent.rule=Host(`${DOMAIN}`) && PathPrefix(`/qbittorrent`) # qBittorrent router rule (path-based)
-      - traefik.http.routers.qbittorrent.entrypoints=websecure # qBittorrent router entrypoint (HTTPS)
-      - traefik.http.routers.qbittorrent.tls=true # Enable TLS for qBittorrent
-      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # qBittorrent certificate resolver
-      - traefik.http.routers.qbittorrent.service=qbittorrent-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to qBittorrent
-      - traefik.http.services.qbittorrent-svc.loadbalancer.server.port=8090 # qBittorrent WebUI port inside Gluetun namespace
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.qbittorrent.service=qbittorrent-service # Define the service name
+      - traefik.http.routers.qbittorrent.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.qbittorrent.rule=Host(`${DOMAIN}`) && PathPrefix(`/qbittorrent`) # Define the HTTP router rule based on the domain
+      - traefik.http.routers.qbittorrent.tls=true # Enable TLS
+      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # Use the defined certificate resolver
+      - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting and Authelia middleware
+      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.regex=^(.*)/qbittorrent$$ # Redirect to add trailing slash
+      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.replacement=$$1/qbittorrent/ # Redirect replacement pattern
+      - traefik.http.middlewares.qbittorrent-strip.stripprefix.prefixes=/qbittorrent/ # Strip /qbittorrent/ prefix
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.X-Frame-Options=SAMEORIGIN # Set X-Frame-Options header
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Referer= # Set Referer header
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Origin= # Set Origin header
+      - traefik.http.routers.qbittorrent.middlewares=qbittorrent-redirect,qbittorrent-strip,qbittorrent-headers # Apply middlewares to the router
+      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=8090 # Define the service port
+      - traefik.http.services.qbittorrent-service.loadbalancer.passhostheader=false # Disable passing the host header
     restart: unless-stopped # Restart policy
 
 ### DOWNLOAD CLIENTS (VPN-BOUND)
@@ -81,23 +90,6 @@ services:
       - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
       - WEBUI_PORT=8090 # Port for the qBittorrent web interface
-    labels:
-      - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.qbittorrent.service=qbittorrent-service # Define the service name
-      - traefik.http.routers.qbittorrent.entrypoints=websecure # Use the websecure entrypoint
-      - traefik.http.routers.qbittorrent.rule=Host(`${DOMAIN}`) && PathPrefix(`/qbittorrent`) # Define the HTTP router rule based on the domain
-      - traefik.http.routers.qbittorrent.tls=true # Enable TLS
-      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # Use the defined certificate resolver
-      - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting and Authelia middleware
-      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.regex=^(.*)/qbittorrent$$ # Redirect to add trailing slash
-      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.replacement=$$1/qbittorrent/ # Redirect replacement pattern
-      - traefik.http.middlewares.qbittorrent-strip.stripprefix.prefixes=/qbittorrent/ # Strip /qbittorrent/ prefix
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.X-Frame-Options=SAMEORIGIN # Set X-Frame-Options header
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Referer= # Set Referer header
-      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Origin= # Set Origin header
-      - traefik.http.routers.qbittorrent.middlewares=qbittorrent-redirect,qbittorrent-strip,qbittorrent-headers # Apply middlewares to the router
-      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=8090 # Define the service port
-      - traefik.http.services.qbittorrent-service.loadbalancer.passhostheader=false # Disable passing the host header
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/qbittorrent:/config # Mount the qBittorrent configuration directory
       - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
