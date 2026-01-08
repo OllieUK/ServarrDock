@@ -1,13 +1,20 @@
-# ServarrDock — Self-Hosted Media & Home Services Stack
+# **ServarrDock — Self-Hosted Media & Home Services Stack**
+
+**WARNING**
+This stack is actively evolving. Documentation reflects the **current stable architecture**, not historical layouts.
 
 ---
-**WARNING** - This stack is currently being rebuilt and is not stable at this current time.
----
 
-ServarrDock is a modular, Docker-based home server setup for media management, home utilities, and supporting infrastructure.
-It is designed around **clear service boundaries**, **low blast radius**, and **independent lifecycles** for different parts of the stack.
+## Overview
 
-The environment is intentionally split into multiple Docker Compose stacks, each with a distinct responsibility, while sharing common networks and configuration.
+ServarrDock is a modular, Docker-based home server environment for media management, home utilities, and supporting infrastructure.
+
+It is designed around:
+
+* clear service boundaries
+* low blast radius
+* independent lifecycles
+* deliberate ingress design
 
 ---
 
@@ -15,155 +22,175 @@ The environment is intentionally split into multiple Docker Compose stacks, each
 
 ServarrDock is organised into several **logical stacks**, each managed by its own Docker Compose file.
 
+---
+
 ### Core Network Infrastructure
+
 **Purpose:** foundational networks required by everything else.
 
-Managed by the root `compose.yml` file.
+Managed by `compose.yml`.
 
 Includes:
-- **Docker networks**
-  - `my-network` (general internal Docker bridge used by non-media stacks as needed)
-  - `media-net` (shared control-plane bridge for media and edge stacks, enables Docker DNS/service-name resolution across stacks)
 
-This stack must be running before any other stack is started.
+* `media-net`
+  Shared control-plane network for edge and media stacks
+* `my-network`
+  General internal bridge for non-media services
+
+This stack must be running before any other stack.
 
 ---
 
 ### Edge Services (Ingress & Authentication)
-**Purpose:** secure external access to internal services.
+
+**Purpose:** secure external access.
 
 Managed by `compose.edge.yml`.
 
 Includes:
-- **Traefik** — reverse proxy, TLS termination, routing
-- **Authelia** — authentication and access control
 
-Traefik attaches to `media-net` and routes to backend services on that network.
-User-facing access is via HTTPS (443/tcp) only.
+* **Traefik** — reverse proxy, TLS termination, routing
+* **Authelia** — authentication and access control
+
+**Ingress model:**
+
+* HTTPS only (443/tcp)
+* Single canonical hostname
+* Path-based routing by default
 
 ---
 
 ### Operations Services
-**Purpose:** background maintenance and resilience tooling.
+
+**Purpose:** background maintenance.
 
 Managed by `compose.ops.yml`.
 
 Includes:
-- **Watchtower** — automated container updates
-  (updates everything by default unless explicitly excluded via labels)
 
-This stack is intentionally isolated from user-facing services.
+* Watchtower (container updates)
+
+Isolated from user-facing services.
 
 ---
 
 ### Media Frontend Services
-**Purpose:** user-facing media access and dashboards.
+
+**Purpose:** user-facing access and dashboards.
 
 Managed by `compose.frontend.yml`.
 
 Examples:
-- **Plex** — media server
-- **Jellyfin** — alternative media server
-- **Tautulli** — Plex monitoring and statistics
-- **Heimdall** — service dashboard
-- **Ombi** — media request management
-- **Audiobookshelf** (if enabled)
 
-These services prioritise **UX stability** and should not be affected by media acquisition restarts.
+* Plex
+* Jellyfin
+* Tautulli
+* Heimdall (landing page)
+* Ombi
+* Audiobookshelf
 
 ---
 
 ### Media Acquisition & Automation Pipeline
-**Purpose:** downloading, indexing, and media automation.
+
+**Purpose:** downloading and automation.
 
 Managed by `compose.pipeline.yml`.
 
 Examples:
-- **Gluetun** — VPN gateway
-- **SABnzbd**, **qBittorrent** — download clients (routed via Gluetun)
-- **Prowlarr**, **Sonarr**, **Radarr**, **Lidarr**, **Bazarr**, etc.
 
-This stack is high-churn by design and can be restarted or updated independently of the frontend.
+* Gluetun (VPN gateway)
+* SABnzbd
+* qBittorrent
+* Prowlarr
+* Sonarr / Radarr / Lidarr / Bazarr / LazyLibrarian
 
----
-
-## Repository Layout (Logical)
-
-docker/  
-├── compose.yml                # Core network infrastructure (networks)  
-├── compose.edge.yml           # Traefik + Authelia  
-├── compose.ops.yml            # Watchtower and ops tooling  
-├── compose.frontend.yml       # Plex, Jellyfin, dashboards  
-├── compose.pipeline.yml       # VPN, downloaders, *arr stack  
-├── .env                       # Shared configuration  
-└── config/                    # Persistent service configuration  
+High-churn by design.
 
 ---
 
-## Operating the Stack
+## User-Facing Ingress Model
 
-### Bring up core infrastructure
-    docker compose up -d
+### Canonical access pattern
 
-### Bring up additional stacks
-    docker compose -p edge     -f compose.edge.yml up -d
-    docker compose -p ops      -f compose.ops.yml up -d
-    docker compose -p frontend -f compose.frontend.yml up -d
-    docker compose -p pipeline -f compose.pipeline.yml up -d
+```
+https://${DOMAIN}/
+```
 
-Stacks can be restarted, updated, or removed independently.
+This resolves to the landing page.
+
+### Path-based services (default)
+
+```
+/sonarr
+/radarr
+/lidarr
+/bazarr
+/prowlarr
+/sabnzbd
+/qbittorrent
+/ombi
+/audiobookshelf
+/tautulli
+```
+
+Characteristics:
+
+* single hostname
+* no DNS sprawl
+* minimal certificate exposure
+* application-native `urlbase` configuration
+
+---
+
+### Host-based exceptions (intentional)
+
+Some services are published under dedicated hostnames due to technical constraints:
+
+* Plex
+* Jellyfin
+* Jellyseerr
+* Traefik (control plane)
+* Authelia (authentication)
+
+These are **explicit exceptions**, not legacy artefacts.
 
 ---
 
 ## Networking and Name Resolution
 
-### Docker networks
-- **media-net**
-  - Shared Docker bridge used by edge + media stacks
-  - Enables service-to-service communication via Docker DNS (service name resolution)
-- **my-network**
-  - General internal Docker bridge used where appropriate by non-media stacks
+### Internal communication
 
-Networks are created by the Core Infrastructure stack and consumed as external networks by all others.
+Services communicate using Docker DNS on `media-net`, e.g.:
 
-### Service-to-service (internal) addressing
-Services should talk to each other using Docker DNS service names and native ports, e.g.
-- `http://sonarr:8989`
-- `http://radarr:7878`
-- `http://plex:32400`
-- Gluetun-shared services are addressed via the Gluetun service name, e.g. `http://gluetun:9696` (Prowlarr)
+```
+http://sonarr:8989
+http://radarr:7878
+http://gluetun:8888
+```
 
-This avoids dependency on LAN DNS for internal container communications.
-
-### User-facing ingress (HTTPS)
-User-facing access is host-based routing via Traefik (443/tcp), using subdomains under a shared zone, e.g.
-- `https://sonarr.<domain>`
-- `https://radarr.<domain>`
-- `https://jellyseerr.<domain>`
-
-Internal DNS is handled via split-horizon:
-- AdGuard forwards queries for `/*.<domain>/` to OpenWrt dnsmasq
-- dnsmasq returns Traefik’s LAN IP for that zone
+LAN DNS is never required for container-to-container traffic.
 
 ---
 
-## Getting Started
+### External DNS
 
-Initial setup, prerequisites, and first-run instructions are documented in
-[INSTALL.md](./INSTALL.md).
+Only `${DOMAIN}` must resolve to Traefik.
+No per-service records are required.
 
 ---
 
-## Philosophy
+## Design Principles
 
-* Prefer **clarity over cleverness**
-* Keep **blast radius small**
-* Separate **user experience**, **automation**, and **infrastructure**
-* Let Docker do what it is good at — no orchestration theatre
+* Prefer **path-based ingress**
+* Let applications own their URL space
+* Keep Traefik thin and predictable
+* Avoid inventory disclosure via DNS and TLS
+* Make exceptions explicit and documented
 
 ---
 
 ## Status
 
-This is a living setup, evolved over time for a specific home environment.
-Documentation is updated when architecture stabilises — not before.
+This is a living system.
+Documentation is updated **after architecture stabilises**, not before.

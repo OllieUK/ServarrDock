@@ -1,4 +1,4 @@
-# ServarrDock — Installation Guide
+# **ServarrDock — Installation Guide**
 
 This guide describes how to set up **ServarrDock**, a modular, Docker-based home server environment for media management, home utilities, and supporting infrastructure.
 
@@ -26,7 +26,7 @@ Optional but assumed in this setup:
 
 Clone the repository and enter the working directory:
 
-```
+```bash
 git clone https://github.com/OllieUK/ServarrDock.git
 cd ServarrDock/docker
 ```
@@ -39,7 +39,7 @@ All commands below are assumed to be run from this `docker/` directory.
 
 Create and populate the shared environment file:
 
-```
+```bash
 cp .env.example .env
 ```
 
@@ -47,40 +47,52 @@ Edit `.env` to define:
 
 * paths for persistent configuration and media storage
 * network parameters (where applicable)
-* domain names and API tokens (where applicable)
+* the canonical domain name (`DOMAIN`)
+* API tokens and credentials (where applicable)
 
 This `.env` file is shared by **all** stacks.
 
 ---
 
-## Traefik TLS Prerequisites (if using HTTPS)
+## Traefik TLS Prerequisites (HTTPS)
 
 Create the ACME storage file for Traefik and secure it:
 
-```
+```bash
 mkdir -p ./config/traefik
 touch ./config/traefik/acme.json
 chmod 600 ./config/traefik/acme.json
 ```
 
-Ensure any dynamic Traefik configuration files referenced in the compose files exist.
+Traefik terminates TLS for **all user-facing services** under a single hostname.
+Only one certificate is required.
 
 ---
 
 ## DNS Prerequisites (recommended)
 
-This setup assumes host-based routing (subdomains) for services behind Traefik, e.g.
+This setup uses **a single public hostname** for all user-facing services.
 
-* `sonarr.<domain>`
-* `radarr.<domain>`
-* `jellyseerr.<domain>`
+### Canonical model
 
-Internal DNS should resolve `*.<domain>` to Traefik’s LAN IP (split-horizon).
+* `${DOMAIN}` resolves to Traefik’s LAN IP (split-horizon)
+* No per-service DNS records are required
+* No wildcard subdomains are required
 
-One implementation pattern:
+User-facing services are exposed via **URL paths**, not subdomains, e.g.:
 
-* dnsmasq returns Traefik’s LAN IP for that zone (via an `address=/*.<domain>/<traefik-ip>` style rule)
-  This avoids having to create a DNS host (A) or CNAME entry for every service.
+```
+https://${DOMAIN}/sonarr
+https://${DOMAIN}/radarr
+https://${DOMAIN}/qbittorrent
+```
+
+### Split-horizon DNS
+
+Internal DNS should resolve `${DOMAIN}` to Traefik’s LAN IP.
+External DNS should resolve `${DOMAIN}` to the public IP or DDNS endpoint.
+
+This avoids DNS sprawl and certificate SAN leakage.
 
 ---
 
@@ -92,13 +104,13 @@ This stack:
 
 Run:
 
-```
+```bash
 docker compose up -d
 ```
 
 Verify networks were created:
 
-```
+```bash
 docker network ls | egrep 'media-net|my-network'
 ```
 
@@ -110,11 +122,15 @@ Nothing else should be started before this step.
 
 This stack provides external access and authentication.
 
-```
+```bash
 docker compose -p edge -f compose.edge.yml up -d
 ```
 
-At this point, Traefik and Authelia should be reachable via their configured domains.
+At this point:
+
+* Traefik is reachable via `https://${DOMAIN}`
+* Authelia protects user-facing services
+* HTTP (80) is globally redirected to HTTPS (443)
 
 ---
 
@@ -122,11 +138,11 @@ At this point, Traefik and Authelia should be reachable via their configured dom
 
 This stack runs background operational tooling.
 
-```
+```bash
 docker compose -p ops -f compose.ops.yml up -d
 ```
 
-By default, Watchtower will update all containers unless explicitly excluded via labels.
+By default, Watchtower updates all containers unless explicitly excluded via labels.
 
 ---
 
@@ -134,11 +150,17 @@ By default, Watchtower will update all containers unless explicitly excluded via
 
 This stack contains user-facing services such as media servers and dashboards.
 
-```
+```bash
 docker compose -p frontend -f compose.frontend.yml up -d
 ```
 
-Verify services are reachable through Traefik using their subdomains.
+Examples of reachable services:
+
+```
+https://${DOMAIN}/        (landing page)
+https://${DOMAIN}/ombi
+https://${DOMAIN}/tautulli
+```
 
 ---
 
@@ -146,7 +168,7 @@ Verify services are reachable through Traefik using their subdomains.
 
 This stack handles downloading, indexing, and automation.
 
-```
+```bash
 docker compose -p pipeline -f compose.pipeline.yml up -d
 ```
 
@@ -158,78 +180,78 @@ This stack is designed for frequent updates and restarts without impacting user-
 
 When using **Gluetun** as a VPN gateway and exposing its built-in HTTP proxy to other services (e.g. Prowlarr), it is **not sufficient** to configure a generic proxy in Prowlarr’s global settings.
 
-Prowlarr requires an explicit **HTTP Indexer Proxy** object to be created.
+Prowlarr requires an explicit **HTTP Indexer Proxy** object.
 
 ### Correct Configuration Pattern
 
-1. Ensure Gluetun’s HTTP proxy is enabled and reachable (e.g. `gluetun:8888`) and that the proxy supports HTTPS CONNECT tunnelling.
-
+1. Ensure Gluetun’s HTTP proxy is enabled and reachable (e.g. `gluetun:8888`)
 2. In Prowlarr, navigate to:
-
    *Settings → Indexer Proxies*
-
 3. Create a new proxy of type:
-
    **HTTP Indexer Proxy**
-
-4. Configure it with:
+4. Configure:
 
    * Host: `gluetun`
    * Port: `8888`
-   * Authentication: none (unless explicitly required)
-
-5. Assign this Indexer Proxy to the relevant indexers.
+   * Authentication: none
+5. Assign this Indexer Proxy to the relevant indexers
 
 ### Important Notes
 
-* Adding proxy details only under *Settings → General → Proxy* is **insufficient** for indexer traffic.
-* Indexer HTTPS requests use explicit CONNECT tunnelling and will fail unless an **Indexer Proxy** is defined.
-* This distinction is critical when troubleshooting `503` or "proxy tunnel" errors in Prowlarr.
-
-This behaviour is by design in Prowlarr and must be documented to avoid repeated misconfiguration.
+* The global proxy setting alone is insufficient
+* HTTPS indexers require CONNECT tunnelling
+* Misconfiguration typically results in `503` or tunnel errors
 
 ---
 
 ## Verification
 
-Check that all containers are running and attached to the expected networks:
+Check container status and network attachment:
 
-```
+```bash
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Networks}}"
 ```
 
-For service-to-service communication, prefer Docker DNS service names on `media-net`, e.g. `http://sonarr:8989`.
+Verify user-facing access:
+
+```
+https://${DOMAIN}/sonarr
+https://${DOMAIN}/radarr
+https://${DOMAIN}/sabnzbd
+```
 
 ---
 
-## Updating and Maintenance
+## Notes on Path-Based Routing
 
-* Individual stacks can be restarted independently.
-* Watchtower manages container updates unless explicitly disabled per service.
-* Infrastructure changes (DNS, networks, ingress) should be performed deliberately and infrequently.
+* Path-based routing is the **default**
+* Applications are configured with native `urlbase` / `baseUrl` settings
+* Traefik does **not** rewrite paths by default
+* `StripPrefix` is used only as a targeted workaround for misbehaving applications
 
 ---
 
 ## Troubleshooting
 
-* Inspect container logs:
+* Inspect logs:
 
-  docker logs <container-name>
-
+  ```bash
+  docker logs <container>
+  ```
 * Verify network attachment:
 
-  docker inspect <container-name> | grep -A5 Networks
-
-* Ensure `.env` values match your actual host and network environment.
+  ```bash
+  docker inspect <container> | grep -A5 Networks
+  ```
+* Ensure `.env` values match the actual environment
 
 ---
 
-## Notes
+## Philosophy
 
 This setup prioritises:
 
-* clear service boundaries
-* low blast radius
-* operational clarity over convenience shortcuts
-
-It is expected to evolve over time; documentation is updated when structure stabilises.
+* clarity over cleverness
+* minimal DNS and certificate exposure
+* small blast radius
+* boring, predictable ingress
