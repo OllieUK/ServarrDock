@@ -35,8 +35,7 @@ services:
       - ${CONFIG_PATH}/ombi:/config # Mount the Ombi configuration directory
     networks:
       my-network:
-      home-macvlan:
-        ipv4_address: ${NET_IP4_OMBI}
+      media-net:  # Connect the container to the media-net network for service discovery
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.ombi.rule=Host(`${DOMAIN}`) && PathPrefix(`/ombi`) # Use the websecure entrypoint
