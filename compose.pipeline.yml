@@ -69,20 +69,37 @@ services:
     network_mode: "service:gluetun" # Share Gluetun network namespace (forces SAB traffic via VPN)
     restart: unless-stopped # Restart policy
 
-  qbittorrent: # BitTorrent client (runs inside Gluetun VPN namespace)
-    image: ghcr.io/linuxserver/qbittorrent # LinuxServer.io qBittorrent image
-    depends_on: # Startup ordering
+  qbittorrent:  # A lightweight and feature-rich BitTorrent client that enables you to download torrents and manage your torrent files.
+    image: ghcr.io/linuxserver/qbittorrent # The qBittorrent Docker image from the LinuxServer.io repository
+    depends_on:
       - gluetun # Ensure Gluetun starts before qBittorrent
-    environment: # Container runtime configuration
-      - PUID=${PUID} # User ID for file ownership
-      - PGID=${PGID} # Group ID for file ownership
+    environment: # Environment variables for the container
+      - PUID=${PUID} # User ID for the container
+      - PGID=${PGID} # Group ID for the container
       - TZ=${TZ} # Time zone
-      - WEBUI_PORT=8090 # qBittorrent WebUI port (must be unique in Gluetun namespace)
-    volumes: # Persistent storage and media access
-      - ${CONFIG_PATH}/qbittorrent:/config # qBittorrent configuration directory
-      - ${MEDIA_PATH}:/media # Media directory (downloads and library paths)
-    network_mode: "service:gluetun" # Share Gluetun network namespace (forces qBit traffic via VPN)
-    restart: unless-stopped # Restart policy
+      - WEBUI_PORT=8090 # Port for the qBittorrent web interface
+    labels:
+      - traefik.enable=true # Enable Traefik for this container
+      - traefik.http.routers.qbittorrent.service=qbittorrent-service # Define the service name
+      - traefik.http.routers.qbittorrent.entrypoints=websecure # Use the websecure entrypoint
+      - traefik.http.routers.qbittorrent.rule=Host(`${DOMAIN}`) && PathPrefix(`/qbittorrent`) # Define the HTTP router rule based on the domain
+      - traefik.http.routers.qbittorrent.tls=true # Enable TLS
+      - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # Use the defined certificate resolver
+      - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting and Authelia middleware
+      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.regex=^(.*)/qbittorrent$$ # Redirect to add trailing slash
+      - traefik.http.middlewares.qbittorrent-redirect.redirectregex.replacement=$$1/qbittorrent/ # Redirect replacement pattern
+      - traefik.http.middlewares.qbittorrent-strip.stripprefix.prefixes=/qbittorrent/ # Strip /qbittorrent/ prefix
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.X-Frame-Options=SAMEORIGIN # Set X-Frame-Options header
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Referer= # Set Referer header
+      - traefik.http.middlewares.qbittorrent-headers.headers.customrequestheaders.Origin= # Set Origin header
+      - traefik.http.routers.qbittorrent.middlewares=qbittorrent-redirect,qbittorrent-strip,qbittorrent-headers # Apply middlewares to the router
+      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=8090 # Define the service port
+      - traefik.http.services.qbittorrent-service.loadbalancer.passhostheader=false # Disable passing the host header
+    volumes: # Bind mount host volumes to the container
+      - ${CONFIG_PATH}/qbittorrent:/config # Mount the qBittorrent configuration directory
+      - ${MEDIA_PATH}:/media # Mount the media directory for storing downloaded files
+    network_mode: "service:gluetun" # Use the Gluetun container's network, routing qBittorrent traffic through the VPN tunnel
+    restart: unless-stopped # Restart the container unless it is explicitly stopped
 
 ### INDEXER AGGREGATOR (VPN-BOUND)
   prowlarr: # Indexer manager that brokers indexers for Sonarr/Radarr/Lidarr
