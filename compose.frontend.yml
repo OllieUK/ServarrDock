@@ -95,6 +95,7 @@ services:
     networks:
       home-macvlan:
         ipv4_address: ${NET_IP4_PLEX}
+      media-net: # Shared media/control-plane bridge for edge + media stacks (Docker DNS)
     labels:
       - traefik.enable=true
       # EXTERNAL (secure, internet + LAN)
