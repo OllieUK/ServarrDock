@@ -5,6 +5,7 @@ name: edge
 
 services:
   traefik:  # Traefik: Modern HTTP reverse proxy and load balancer.
+    container_name: traefik
     # Directs incoming requests to appropriate services based on the request details.
     image: traefik:v3.6.4
     command:
@@ -58,6 +59,7 @@ services:
       media-net: # Connect to the media/control-plane network
     restart: unless-stopped # Ensures service restarts if it crashes.
   authelia: # Authelia: Single Sign-On (SSO) solution for protecting web applications.
+    container_name: authelia
     # Integrates with reverse proxies to secure access with Two-Factor Authentication (2FA) and Single Sign-On.
     image: authelia/authelia:4.39.15
     volumes:

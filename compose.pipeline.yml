@@ -10,6 +10,7 @@ name: pipeline # Compose project name for this stack
 services:
 ### NETWORK SERVICES
   gluetun: # VPN gateway container used as a shared network namespace for selected services
+    container_name: gluetun
     image: qmcgaw/gluetun:v3.34 # Gluetun image (pinned version as a workaround)
     devices: # Host devices passed through to the container
       - /dev/net/tun:/dev/net/tun # TUN device required for VPN tunnelling
@@ -55,6 +56,7 @@ services:
 
 ### DOWNLOAD CLIENTS (VPN-BOUND)
   sabnzbd: # Usenet downloader (runs inside Gluetun VPN namespace)
+    container_name: sabnzbd
     image: ghcr.io/linuxserver/sabnzbd # LinuxServer.io SABnzbd image
     depends_on: # Startup ordering
       - gluetun # Ensure Gluetun starts before SABnzbd
@@ -70,6 +72,7 @@ services:
     restart: unless-stopped # Restart policy
 
   qbittorrent:  # A lightweight and feature-rich BitTorrent client that enables you to download torrents and manage your torrent files.
+    container_name: qbittorrent
     image: ghcr.io/linuxserver/qbittorrent # The qBittorrent Docker image from the LinuxServer.io repository
     depends_on:
       - gluetun # Ensure Gluetun starts before qBittorrent
@@ -103,6 +106,7 @@ services:
 
 ### INDEXER AGGREGATOR (VPN-BOUND)
   prowlarr: # Indexer manager that brokers indexers for Sonarr/Radarr/Lidarr
+    container_name: prowlarr
     image: ghcr.io/linuxserver/prowlarr:latest # LinuxServer.io Prowlarr image
     depends_on: # Startup ordering
       - gluetun # Ensure Gluetun starts before Prowlarr
@@ -128,6 +132,7 @@ services:
 
 ### MEDIA MANAGERS (NON-VPN, BRIDGE + DOCKER DNS)
   radarr: # Movie library manager and automation service
+    container_name: radarr
     image: ghcr.io/linuxserver/radarr # LinuxServer.io Radarr image
     depends_on: # Startup ordering
       - gluetun # Ensure Gluetun (and thus download clients) is up before Radarr starts
@@ -153,6 +158,7 @@ services:
     restart: unless-stopped # Restart policy
 
   sonarr: # TV library manager and automation service
+    container_name: sonarr
     image: ghcr.io/linuxserver/sonarr # LinuxServer.io Sonarr image
     depends_on: # Startup ordering
       - gluetun # Ensure Gluetun (and thus download clients) is up before Sonarr starts
@@ -178,6 +184,7 @@ services:
     restart: unless-stopped # Restart policy
 
   lidarr: # Music library manager and automation service
+    container_name: lidarr
     image: ghcr.io/linuxserver/lidarr # LinuxServer.io Lidarr image
     depends_on: # Startup ordering
       - gluetun # Ensure Gluetun (and thus download clients) is up before Lidarr starts
@@ -203,6 +210,7 @@ services:
     restart: unless-stopped # Restart policy
 
   lazylibrarian: # Book, magazine, and audiobook manager
+    container_name: lazylibrarian
     image: lscr.io/linuxserver/lazylibrarian:latest # LinuxServer.io LazyLibrarian image
     depends_on: # Startup ordering
       - gluetun # Ensure Gluetun (and thus download clients) is up before LazyLibrarian starts
@@ -228,6 +236,7 @@ services:
     restart: unless-stopped # Restart policy
 
   bazarr: # Subtitle manager for Sonarr and Radarr
+    container_name: bazarr
     image: ghcr.io/linuxserver/bazarr # LinuxServer.io Bazarr image
     depends_on: # Startup ordering
       - gluetun # Ensure Gluetun (and thus download clients) is up before Bazarr starts

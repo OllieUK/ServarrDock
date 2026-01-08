@@ -5,6 +5,7 @@ name: ops
 
 services:
   watchtower: # Automatically monitors and updates running Docker containers when a new image is available.
+    container_name: watchtower
     image: containrrr/watchtower
     restart: unless-stopped
     environment:

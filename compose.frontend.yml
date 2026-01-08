@@ -6,6 +6,7 @@ name: frontend
 services:
 ### WEB FRONTENDS
   heimdall: # A web-based front-end dashboard that allows you to organize, manage, and access all your self-hosted services in one place.
+    container_name: heimdall
     image: ghcr.io/linuxserver/heimdall # The Heimdall Docker image from the LinuxServer.io repository
     environment: # Environment variables for the container
       - PUID=${PUID} # User ID for the container
@@ -26,6 +27,7 @@ services:
       - traefik.http.routers.heimdall.middlewares=rateLimitMiddleware@file,authelia@file
       - traefik.http.services.heimdall.loadbalancer.server.port=80
   ombi: # A web application that gives Plex or Emby users the ability to request content
+    container_name: ombi
     image: linuxserver/ombi # The Ombi Docker image from the LinuxServer.io repository
     environment: # Environment variables for the container
       - PUID=${PUID} # User ID for the container
@@ -46,6 +48,7 @@ services:
     restart: unless-stopped # Policy for automatically restarting the container
 
   jellyseerr: # A web application that allows users to request movies and TV shows for Plex.
+    container_name: jellyseerr
     image: ghcr.io/fallenbagel/jellyseerr:latest # The Jellyseerr Docker image from the LinuxServer.io repository
     init: true # Use init system to handle process signals and reaping
     environment: # Environment variables for the container
@@ -74,6 +77,7 @@ services:
 
 ### MEDIA PLAYERS
   plex: # A powerful media server that organizes and streams your media.
+    container_name: plex
     image: ghcr.io/linuxserver/plex
     environment:
       - PUID=${PUID}
@@ -110,6 +114,7 @@ services:
     restart: unless-stopped
 
   jellyfin: # An open-source media server, alternative/backup to Plex.
+    container_name: jellyfin
     image: lscr.io/linuxserver/jellyfin:latest # Jellyfin Docker image from LinuxServer.io
     environment:
       - PUID=${PUID} # Run Jellyfin as the same UID as other media services
@@ -143,6 +148,7 @@ services:
 
 ### OTHER MANAGEMENT TOOLS
   tautulli:
+    container_name: tautulli
     image: ghcr.io/linuxserver/tautulli
     depends_on:
       - plex
@@ -161,7 +167,7 @@ services:
 
   suggestarr:
     image: ciuse99/suggestarr:latest
-    container_name: SuggestArr
+    container_name: suggestarr
     restart: always
     environment:
       # Optional: Only needed if something goes wrong and you need to inspect deeper
@@ -176,6 +182,7 @@ services:
       media-net: # Shared media/control-plane bridge for edge + med
 
   audiobookshelf: # A self-hosted server for audiobooks and podcasts.
+    container_name: audiobookshelf
     image: ghcr.io/advplyr/audiobookshelf:latest
     environment:
       - PUID=${PUID}
