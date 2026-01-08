@@ -10,7 +10,8 @@ services:
     command:
       - "--log.level=INFO" # Set log level to DEBUG for detailed logs.
       - "--providers.docker=true" # Use Docker as the provider for dynamic configuration.
-      - "--providers.docker.network=media-net" # Specify the Docker network to monitor for services.
+      # - "--providers.docker.network=media-net" # Specify the Docker network to monitor for services.
+      # Removed to test across multiple nets.
       - "--providers.docker.exposedbydefault=false" # Prevent automatic exposure of Docker services.
       - "--entrypoints.web.address=:${TRAEFIK_ENTRYPOINT_HTTP_PORT:-80}" # Define HTTP entrypoint. Default to 80 if not set.
       - "--entrypoints.websecure.address=:${TRAEFIK_ENTRYPOINT_HTTPS_PORT:-443}" # Define HTTPS entrypoint. Default to 443 if not set.
