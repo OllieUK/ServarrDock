@@ -256,7 +256,7 @@ services:
   maintainerr: # MaintainerR: A self-hosted service to track and manage updates for your Docker containers.
     image: ghcr.io/maintainerr/maintainerr:latest # or jorenn92/maintainerr:latest
     container_name: maintainerr
-    user: ${PUID}:${PGID}
+    user: 1000:1000
     volumes:
       - ${CONFIG_PATH}/maintainerr:/opt/data
     environment:
@@ -276,9 +276,7 @@ services:
       - traefik.http.routers.maintainerr.tls.certresolver=myresolver # Maintainerr certificate resolver
       - traefik.http.routers.maintainerr.service=maintainerr-svc # Explicitly bind router to service name (avoids ambiguity)
       - traefik.http.routers.maintainerr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Maintainerr
-      - traefik.http.services.maintainerr-svc.loadbalancer.server.port=6767 # Maintainerr internal port
-    ports:
-          - 6246:6246
+      - traefik.http.services.maintainerr-svc.loadbalancer.server.port=6246 # Maintainerr internal port
     restart: unless-stopped
 
 networks: # External networks created/anchored by the infrastructure stack
