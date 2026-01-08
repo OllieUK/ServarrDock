@@ -38,14 +38,14 @@ services:
       - "traefik.enable=true" # Enable Traefik for this container
       - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)" # Router rule to match the host
       - "traefik.http.routers.traefik.entrypoints=websecure" # Use the websecure entrypoint
-      - "traefik.http.routers.traefik.tls.certresolver=myresolver" # Use the defined certificate resolver
-      - "traefik.http.routers.traefik.service=api@internal" # Use the internal Traefik API service
       - "traefik.http.routers.traefik.tls=true" # Enable TLS
+      - "traefik.http.routers.traefik.tls.certresolver=myresolver" # Use the defined certificate resolver
       - "traefik.http.routers.traefik.tls.domains[0].main=${DOMAIN}" # Define the main domain for TLS
       - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}" # Define a wildcard subdomain for TLS
       - "traefik.http.routers.traefik.middlewares=rateLimitMiddleware@file,authelia@file"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"  # Create a middleware named 'redirect-to-https' for HTTP to HTTPS redirection
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"  # Set the redirect as permanent (HTTP 301)
+      - "traefik.http.routers.traefik.service=api@internal" # Use the internal Traefik API service
       - "com.centurylinklabs.watchtower.enable=false" # Disable Watchtower updates for Traefik
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # Allows Traefik to interact with Docker.
@@ -72,8 +72,8 @@ services:
       - "traefik.http.routers.authelia.rule=Host(`auth.home.carr-it.net`)" # Router rule that matches the domain name of the Authelia service
       - "traefik.http.routers.authelia.entrypoints=websecure" # Defines the entrypoint for this router, it should be the HTTPS entrypoint
       - "traefik.http.routers.authelia.tls.certresolver=myresolver" # This tells Traefik to use the previously defined certificate resolver for this service
-      - "traefik.http.services.authelia.loadbalancer.server.port=9091" # Authelia's internal port that needs to be exposed to the network
       - "traefik.http.routers.authelia.middlewares=rateLimitMiddleware@file" # Apply rate limiting middleware from the file provider
+      - "traefik.http.services.authelia.loadbalancer.server.port=9091" # Authelia's internal port that needs to be exposed to the network
       - "com.centurylinklabs.watchtower.enable=false" # Disable Watchtower updates for Authelia
     networks:
       - my-network # The custom network, Authelia needs to be on the same network as Traefik for routing to work

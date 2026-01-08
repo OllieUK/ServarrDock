@@ -23,8 +23,8 @@ services:
       - traefik.http.routers.heimdall.rule=Host(`${DOMAIN}`) # Define the routing rule for home.carr-it.net
       - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.services.heimdall.loadbalancer.server.port=80
       - traefik.http.routers.heimdall.middlewares=rateLimitMiddleware@file,authelia@file
+      - traefik.http.services.heimdall.loadbalancer.server.port=80
   ombi: # A web application that gives Plex or Emby users the ability to request content
     image: linuxserver/ombi # The Ombi Docker image from the LinuxServer.io repository
     environment: # Environment variables for the container
@@ -41,8 +41,8 @@ services:
       - traefik.http.routers.ombi.rule=Host(`${DOMAIN}`) && PathPrefix(`/ombi`) # Use the websecure entrypoint
       - traefik.http.routers.ombi.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.ombi.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.services.ombi.loadbalancer.server.port=3579 # Define the port for the Ombi service
       - traefik.http.routers.ombi.middlewares=rateLimitMiddleware@file
+      - traefik.http.services.ombi.loadbalancer.server.port=3579 # Define the port for the Ombi service
     restart: unless-stopped # Policy for automatically restarting the container
 
   jellyseerr: # A web application that allows users to request movies and TV shows for Plex.
@@ -62,8 +62,8 @@ services:
       - traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.${DOMAIN}`) # Define the routing rule for jellyseerr.DOMAIN
       - traefik.http.routers.jellyseerr.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.jellyseerr.tls.certresolver=myresolver # Use the myresolver certificate resolver
-      - traefik.http.services.jellyseerr.loadbalancer.server.port=5055 # Define the port for the Jellyseerr service
       - traefik.http.routers.jellyseerr.middlewares=rateLimitMiddleware@file
+      - traefik.http.services.jellyseerr.loadbalancer.server.port=5055 # Define the port for the Jellyseerr service
     # healthcheck:
     #   test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
     #   start_period: 20s
@@ -134,7 +134,7 @@ services:
     gpus: all # Enable GPU support
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.jellyfin.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/jellyfin`) # Route Jellyfin under /jellyfin
+      - traefik.http.routers.jellyfin.rule=Host(`jellyfin.${DOMAIN}`) # Jellyfin on its own host for MACVLAN IP
       - traefik.http.routers.jellyfin.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.jellyfin.tls.certresolver=myresolver # Use your certificate resolver
       - traefik.http.routers.jellyfin.middlewares=rateLimitMiddleware@file # Apply security middleware (optionally add authelia@file)
@@ -191,10 +191,11 @@ services:
       
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.audiobookshelf.rule=Host(`audiobookshelf.${DOMAIN}`) # Define the routing rule
+      - traefik.http.routers.audiobookshelf.rule=Host(`${DOMAIN}`) && PathPrefix(`/audiobookshelf`) # Define the routing rule
       - traefik.http.routers.audiobookshelf.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.audiobookshelf.tls.certresolver=myresolver # Use your certificate resolver
-      - traefik.http.routers.audiobookshelf.middlewares=rateLimitMiddleware@file # Apply your security middlewares
+      - traefik.http.routers.audiobookshelf.middlewares=audiobookshelf-strip,rateLimitMiddleware@file # Apply your security middlewares
+      - traefik.http.middlewares.audiobookshelf-strip.stripprefix.prefixes=/audiobookshelf
       - traefik.http.services.audiobookshelf.loadbalancer.server.port=80 # Correct internal port for Audiobookshelf
     restart: unless-stopped
 
