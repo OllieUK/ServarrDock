@@ -253,6 +253,34 @@ services:
       - traefik.http.services.bazarr-svc.loadbalancer.server.port=6767 # Bazarr internal port
     restart: unless-stopped # Restart policy
 
+  maintainerr: # MaintainerR: A self-hosted service to track and manage updates for your Docker containers.
+    image: ghcr.io/maintainerr/maintainerr:latest # or jorenn92/maintainerr:latest
+    container_name: maintainerr
+    user: ${PUID}:${PGID}
+    volumes:
+      - ${CONFIG_PATH}/maintainerr:/opt/data
+    environment:
+      - TZ=${TZ}
+      - BASE_PATH=/maintainerr # uncomment if you're serving Maintainerr from a subdirectory
+#      - UI_HOSTNAME=:: # uncomment if you want to listen on IPv6 instead (default 0.0.0.0)
+#      - UI_PORT=6247 # uncomment to change the UI port (default 6246)
+#      - GITHUB_TOKEN=ghp_yourtoken # Optional: GitHub Personal Access Token for higher API rate limits (60/hr without, 5000/hr with token)
+    networks: # Network attachments
+      - media-net # Shared media/control-plane bridge (Traefik + Docker DNS)
+    labels: # Traefik routing labels (path-based)
+      - traefik.enable=true # Enable Traefik for Maintainerr
+      - traefik.docker.network=media-net # Force Traefik to use media-net when reaching Maintainerr
+      - traefik.http.routers.maintainerr.rule=Host(`${DOMAIN}`) && PathPrefix(`/maintainerr`) # maintainerr router rule (path-based)
+      - traefik.http.routers.maintainerr.entrypoints=websecure # Maintainerr router entrypoint (HTTPS)
+      - traefik.http.routers.maintainerr.tls=true # Enable TLS for Maintainerr
+      - traefik.http.routers.maintainerr.tls.certresolver=myresolver # Maintainerr certificate resolver
+      - traefik.http.routers.maintainerr.service=maintainerr-svc # Explicitly bind router to service name (avoids ambiguity)
+      - traefik.http.routers.maintainerr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Maintainerr
+      - traefik.http.services.maintainerr-svc.loadbalancer.server.port=6767 # Maintainerr internal port
+    ports:
+          - 6246:6246
+        restart: unless-stopped
+
 networks: # External networks created/anchored by the infrastructure stack
   my-network: # General-purpose shared bridge (legacy / non-media stacks)
     external: true # Use the existing external network
