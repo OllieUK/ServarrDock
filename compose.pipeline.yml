@@ -40,8 +40,7 @@ services:
       - traefik.http.routers.sabnzbd.tls=true # Enable TLS for SABnzbd
       - traefik.http.routers.sabnzbd.tls.certresolver=myresolver # SABnzbd certificate resolver
       - traefik.http.routers.sabnzbd.service=sabnzbd-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.sabnzbd.middlewares=sabnzbd-strip,rateLimitMiddleware@file,authelia@file # Apply strip + rate limiting + Authelia to SABnzbd
-      - traefik.http.middlewares.sabnzbd-strip.stripprefix.prefixes=/sabnzbd # Strip the /sabnzbd prefix
+      - traefik.http.routers.sabnzbd.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to SABnzbd
       - traefik.http.services.sabnzbd-svc.loadbalancer.server.port=8080 # SABnzbd internal port inside Gluetun namespace
 
       # qBittorrent labels
@@ -50,8 +49,7 @@ services:
       - traefik.http.routers.qbittorrent.tls=true # Enable TLS for qBittorrent
       - traefik.http.routers.qbittorrent.tls.certresolver=myresolver # qBittorrent certificate resolver
       - traefik.http.routers.qbittorrent.service=qbittorrent-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.qbittorrent.middlewares=qbittorrent-strip,rateLimitMiddleware@file,authelia@file # Apply strip + rate limiting + Authelia to qBittorrent
-      - traefik.http.middlewares.qbittorrent-strip.stripprefix.prefixes=/qbittorrent # Strip the /qbittorrent prefix
+      - traefik.http.routers.qbittorrent.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to qBittorrent
       - traefik.http.services.qbittorrent-svc.loadbalancer.server.port=8090 # qBittorrent WebUI port inside Gluetun namespace
     restart: unless-stopped # Restart policy
 
@@ -107,8 +105,7 @@ services:
       - traefik.http.routers.prowlarr.tls=true # Enable TLS for Prowlarr
       - traefik.http.routers.prowlarr.tls.certresolver=myresolver # Prowlarr certificate resolver
       - traefik.http.routers.prowlarr.service=prowlarr-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.prowlarr.middlewares=prowlarr-strip,rateLimitMiddleware@file,authelia@file # Apply strip + rate limiting + Authelia to Prowlarr
-      - traefik.http.middlewares.prowlarr-strip.stripprefix.prefixes=/prowlarr # Strip the /prowlarr prefix
+      - traefik.http.routers.prowlarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Prowlarr
       - traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696 #  Prowlarr internal port
     restart: unless-stopped # Restart policy
 
@@ -134,8 +131,7 @@ services:
       - traefik.http.routers.radarr.tls=true # Enable TLS for Radarr
       - traefik.http.routers.radarr.tls.certresolver=myresolver # Radarr certificate resolver
       - traefik.http.routers.radarr.service=radarr-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.radarr.middlewares=radarr-strip,rateLimitMiddleware@file,authelia@file # Apply strip + rate limiting + Authelia to Radarr
-      - traefik.http.middlewares.radarr-strip.stripprefix.prefixes=/radarr # Strip the /radarr prefix
+      - traefik.http.routers.radarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Radarr
       - traefik.http.services.radarr-svc.loadbalancer.server.port=7878 # Radarr internal port
     restart: unless-stopped # Restart policy
 
@@ -160,8 +156,7 @@ services:
       - traefik.http.routers.sonarr.tls=true # Enable TLS for Sonarr
       - traefik.http.routers.sonarr.tls.certresolver=myresolver # Sonarr certificate resolver
       - traefik.http.routers.sonarr.service=sonarr-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.sonarr.middlewares=sonarr-strip,rateLimitMiddleware@file,authelia@file # Apply strip + rate limiting + Authelia to Sonarr
-      - traefik.http.middlewares.sonarr-strip.stripprefix.prefixes=/sonarr # Strip the /sonarr prefix
+      - traefik.http.routers.sonarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Sonarr
       - traefik.http.services.sonarr-svc.loadbalancer.server.port=8989 # Sonarr internal port
     restart: unless-stopped # Restart policy
 
@@ -186,8 +181,7 @@ services:
       - traefik.http.routers.lidarr.tls=true # Enable TLS for Lidarr
       - traefik.http.routers.lidarr.tls.certresolver=myresolver # Lidarr certificate resolver
       - traefik.http.routers.lidarr.service=lidarr-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.lidarr.middlewares=lidarr-strip,rateLimitMiddleware@file,authelia@file # Apply strip + rate limiting + Authelia to Lidarr
-      - traefik.http.middlewares.lidarr-strip.stripprefix.prefixes=/lidarr # Strip the /lidarr prefix
+      - traefik.http.routers.lidarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Lidarr
       - traefik.http.services.lidarr-svc.loadbalancer.server.port=8686 # Lidarr internal port
     restart: unless-stopped # Restart policy
 
@@ -212,8 +206,7 @@ services:
       - traefik.http.routers.lazylibrarian.tls=true # Enable TLS for LazyLibrarian
       - traefik.http.routers.lazylibrarian.tls.certresolver=myresolver # LazyLibrarian certificate resolver
       - traefik.http.routers.lazylibrarian.service=lazylibrarian-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.lazylibrarian.middlewares=lazylibrarian-strip,rateLimitMiddleware@file,authelia@file # Apply strip + rate limiting + Authelia to LazyLibrarian
-      - traefik.http.middlewares.lazylibrarian-strip.stripprefix.prefixes=/lazylibrarian # Strip the /lazylibrarian prefix
+      - traefik.http.routers.lazylibrarian.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to LazyLibrarian
       - traefik.http.services.lazylibrarian-svc.loadbalancer.server.port=5299 # LazyLibrarian internal port
     restart: unless-stopped # Restart policy
 
@@ -238,8 +231,7 @@ services:
       - traefik.http.routers.bazarr.tls=true # Enable TLS for Bazarr
       - traefik.http.routers.bazarr.tls.certresolver=myresolver # Bazarr certificate resolver
       - traefik.http.routers.bazarr.service=bazarr-svc # Explicitly bind router to service name (avoids ambiguity)
-      - traefik.http.routers.bazarr.middlewares=bazarr-strip,rateLimitMiddleware@file,authelia@file # Apply strip + rate limiting + Authelia to Bazarr
-      - traefik.http.middlewares.bazarr-strip.stripprefix.prefixes=/bazarr # Strip the /bazarr prefix
+      - traefik.http.routers.bazarr.middlewares=rateLimitMiddleware@file,authelia@file # Apply rate limiting + Authelia to Bazarr
       - traefik.http.services.bazarr-svc.loadbalancer.server.port=6767 # Bazarr internal port
     restart: unless-stopped # Restart policy
 

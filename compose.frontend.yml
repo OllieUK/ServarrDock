@@ -194,8 +194,7 @@ services:
       - traefik.http.routers.audiobookshelf.rule=Host(`${DOMAIN}`) && PathPrefix(`/audiobookshelf`) # Define the routing rule
       - traefik.http.routers.audiobookshelf.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.audiobookshelf.tls.certresolver=myresolver # Use your certificate resolver
-      - traefik.http.routers.audiobookshelf.middlewares=audiobookshelf-strip,rateLimitMiddleware@file # Apply your security middlewares
-      - traefik.http.middlewares.audiobookshelf-strip.stripprefix.prefixes=/audiobookshelf
+      - traefik.http.routers.audiobookshelf.middlewares=rateLimitMiddleware@file # Apply your security middlewares
       - traefik.http.services.audiobookshelf.loadbalancer.server.port=80 # Correct internal port for Audiobookshelf
     restart: unless-stopped
 
