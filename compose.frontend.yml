@@ -17,6 +17,7 @@ services:
       my-network:
       # home-macvlan: # Connect the container to the home-macvlan network
       #   ipv4_address: ${NET_IP4_HEIMDALL}
+      media-net:  # Connect the container to the media-net network for service discovery
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.heimdall-http.rule=Host(`${DOMAIN}`) # Define the HTTP router rule for home.carr-it.net
@@ -58,7 +59,8 @@ services:
       - LOG_LEVEL=debug # Set log level to debug for detailed logging
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/jellyseerr:/app/config # Mount the Jellyseerr configuration directory
-    network_mode: "service:gluetun" # Set the network mode to use Gluetun's network, effectively routing traffic through Gluetun's VPN connection
+    networks:
+      media-net:  # Connect the container to the media-net network for service discovery
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.${DOMAIN}`) # Define the routing rule for jellyseerr.DOMAIN
@@ -95,11 +97,6 @@ services:
         ipv4_address: ${NET_IP4_PLEX}
     labels:
       - traefik.enable=true
-      # INTERNAL (unsecured, LAN-only)
-      - traefik.http.routers.plex_int.rule=Host(`plex.internal`)
-      - traefik.http.routers.plex_int.entrypoints=webinternal
-      - traefik.http.routers.plex_int.service=plex_int_service
-      - traefik.http.services.plex_int_service.loadbalancer.server.port=32400
       # EXTERNAL (secure, internet + LAN)
       - traefik.http.routers.plex_ext.rule=Host(`plex.${DOMAIN}`)
       - traefik.http.routers.plex_ext.entrypoints=websecure
@@ -170,15 +167,17 @@ services:
     image: ciuse99/suggestarr:latest
     container_name: SuggestArr
     restart: always
-    ports:
-      - "${SUGGESTARR_PORT:-5000}:${SUGGESTARR_PORT:-5000}"
-    volumes:
-      - ${CONFIG_PATH}/suggestarr:/app/config/config_files
     environment:
       # Optional: Only needed if something goes wrong and you need to inspect deeper
       - LOG_LEVEL=${LOG_LEVEL:-info}
       # Optional: Customize the port (defaults to 5000 if not set)
       - SUGGESTARR_PORT=${SUGGESTARR_PORT:-5000}
+    ports:
+      - "${SUGGESTARR_PORT:-5000}:${SUGGESTARR_PORT:-5000}"
+    volumes:
+      - ${CONFIG_PATH}/suggestarr:/app/config/config_files
+    networks:
+      media-net: # Shared media/control-plane bridge for edge + med
 
   audiobookshelf: # A self-hosted server for audiobooks and podcasts.
     image: ghcr.io/advplyr/audiobookshelf:latest
@@ -192,9 +191,11 @@ services:
     networks:
       home-macvlan:
         ipv4_address: ${NET_IP4_AUDIOBOOKSHELF}
+      media-net: # Shared media/control-plane bridge for edge + media stacks (Docker DNS)
+      external: true # Use the existing external network
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.audiobookshelf.rule=Host(`media.${DOMAIN}`) && PathPrefix(`/audiobookshelf`) # Define the routing rule
+      - traefik.http.routers.audiobookshelf.rule=Host(`audiobookshelf.${DOMAIN}`) # Define the routing rule
       - traefik.http.routers.audiobookshelf.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.audiobookshelf.tls.certresolver=myresolver # Use your certificate resolver
       - traefik.http.routers.audiobookshelf.middlewares=rateLimitMiddleware@file # Apply your security middlewares
@@ -206,3 +207,5 @@ networks:
     external: true  # Use the existing external network
   home-macvlan: # Name of the MACVLAN network
     external: true  # Use the existing external MACVLAN network
+  media-net: # Shared media/control-plane bridge for edge + media stacks (Docker DNS)
+    external: true # Use the existing external network
