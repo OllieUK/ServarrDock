@@ -192,7 +192,7 @@ services:
       home-macvlan:
         ipv4_address: ${NET_IP4_AUDIOBOOKSHELF}
       media-net: # Shared media/control-plane bridge for edge + media stacks (Docker DNS)
-      external: true # Use the existing external network
+      
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
       - traefik.http.routers.audiobookshelf.rule=Host(`audiobookshelf.${DOMAIN}`) # Define the routing rule
