@@ -69,7 +69,7 @@ services:
       # Add other necessary environment variables based on your Authelia configuration
     labels:
       - "traefik.enable=true" # Enable Traefik for this container, it makes the Authelia service discoverable by Traefik
-      - "traefik.http.routers.authelia.rule=Host(`auth.${}`)" # Router rule that matches the domain name of the Authelia service
+      - "traefik.http.routers.authelia.rule=Host(`auth.${DOMAIN}`)" # Router rule that matches the domain name of the Authelia service
       - "traefik.http.routers.authelia.entrypoints=websecure" # Defines the entrypoint for this router, it should be the HTTPS entrypoint
       - "traefik.http.routers.authelia.tls.certresolver=myresolver" # This tells Traefik to use the previously defined certificate resolver for this service
       - "traefik.http.routers.authelia.middlewares=rateLimitMiddleware@file" # Apply rate limiting middleware from the file provider
