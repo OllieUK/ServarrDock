@@ -279,7 +279,7 @@ services:
       - traefik.http.services.maintainerr-svc.loadbalancer.server.port=6767 # Maintainerr internal port
     ports:
           - 6246:6246
-        restart: unless-stopped
+    restart: unless-stopped
 
 networks: # External networks created/anchored by the infrastructure stack
   my-network: # General-purpose shared bridge (legacy / non-media stacks)
