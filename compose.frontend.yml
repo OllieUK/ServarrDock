@@ -14,15 +14,12 @@ services:
     volumes: # Bind mount host volumes to the container
       - ${CONFIG_PATH}/heimdall:/config # Mount the Heimdall configuration directory
     networks:
-      my-network:
+      # my-network:
       # home-macvlan: # Connect the container to the home-macvlan network
       #   ipv4_address: ${NET_IP4_HEIMDALL}
       media-net:  # Connect the container to the media-net network for service discovery
     labels: # Traefik configuration labels
       - traefik.enable=true # Enable Traefik for this container
-      - traefik.http.routers.heimdall-http.rule=Host(`${DOMAIN}`) # Define the HTTP router rule for home.carr-it.net
-      - traefik.http.routers.heimdall-http.entrypoints=web # Use the 'web' entrypoint for the HTTP router
-      - traefik.http.routers.heimdall-http.middlewares=redirect-to-https # Apply the 'redirect-to-https' middleware to the HTTP router
       - traefik.http.routers.heimdall.rule=Host(`${DOMAIN}`) # Define the routing rule for home.carr-it.net
       - traefik.http.routers.heimdall.entrypoints=websecure # Use the websecure entrypoint
       - traefik.http.routers.heimdall.tls.certresolver=myresolver # Use the myresolver certificate resolver
@@ -209,3 +206,4 @@ networks:
     external: true  # Use the existing external MACVLAN network
   media-net: # Shared media/control-plane bridge for edge + media stacks (Docker DNS)
     external: true # Use the existing external network
+    name: media-net
