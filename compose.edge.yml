@@ -43,7 +43,7 @@ services:
       - "traefik.http.routers.traefik.tls.certresolver=myresolver" # Use the defined certificate resolver
       - "traefik.http.routers.traefik.tls.domains[0].main=${DOMAIN}" # Define the main domain for TLS
       - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}" # Define a wildcard subdomain for TLS
-      - "traefik.http.routers.traefik.middlewares=rateLimitMiddleware@file,authelia@file"
+      - "traefik.http.routers.traefik.middlewares=rateLimitMiddleware@file,authentik-forward-auth@file" # Apply rate limiting and forward authentication middlewares
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"  # Create a middleware named 'redirect-to-https' for HTTP to HTTPS redirection
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"  # Set the redirect as permanent (HTTP 301)
       - "traefik.http.routers.traefik.service=api@internal" # Use the internal Traefik API service
