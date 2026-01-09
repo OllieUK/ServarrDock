@@ -1,4 +1,4 @@
-# Core DNS & Network Infrastructure
+# Core Network Infrastructure incl. Edge & Access Control Services
 # This stack defines and operates essential network services and Docker networks that all other application stacks depend on.
 
 name: infra
@@ -14,6 +14,154 @@ services:
     networks:
       - my-network # Connects to the internal bridge network to give it a 'home'.
       - media-net # Connects to the new media/control-plane network.
+  traefik:  # Traefik: Modern HTTP reverse proxy and load balancer.
+    container_name: traefik
+    # Directs incoming requests to appropriate services based on the request details.
+    image: traefik:v3.6.4
+    command:
+      - "--log.level=INFO" # Set log level to DEBUG for detailed logs.
+      - "--providers.docker=true" # Use Docker as the provider for dynamic configuration.
+      # - "--providers.docker.network=media-net" # Specify the Docker network to monitor for services.
+      # Removed to test across multiple nets.
+      - "--providers.docker.exposedbydefault=false" # Prevent automatic exposure of Docker services.
+      - "--entrypoints.web.address=:${TRAEFIK_ENTRYPOINT_HTTP_PORT:-80}" # Define HTTP entrypoint. Default to 80 if not set.
+      - "--entrypoints.websecure.address=:${TRAEFIK_ENTRYPOINT_HTTPS_PORT:-443}" # Define HTTPS entrypoint. Default to 443 if not set.
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure" # Redirect HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https" # Redirect scheme from HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true" # Set the redirect as permanent (HTTP 301)
+      - "--certificatesresolvers.myresolver.acme.dnschallenge=true" # Enable DNS challenge for Let's Encrypt
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=cloudflare" # Set Cloudflare as the DNS provider
+      - "--certificatesresolvers.myresolver.acme.email=${CF_API_EMAIL}" # Set the email for Let's Encrypt registration
+      - "--certificatesresolvers.myresolver.acme.storage=/acme.json" # Define the storage file for ACME certificates
+      - "--certificatesResolvers.myresolver.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53" # Set the DNS resolvers for the DNS challenge
+      # - "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory" # (Optional) Use the Let's Encrypt staging server for testing
+      - "--api.dashboard=true" # Enable the Traefik dashboard
+      # - "--providers.file.filename=/dynamic.yml"
+      - "--providers.file.directory=/etc/traefik/dynamic" # Directory for dynamic configuration files
+      - "--providers.file.watch=true" # Watch for changes in the dynamic configuration files
+    ports:
+      - "80:80" # Map HTTP port for external access.
+      - "443:443" # Map HTTPS port for secure external access.
+    environment: # Environment variables for the container
+      - "CF_API_EMAIL=${CF_API_EMAIL}" # Cloudflare API email
+      - "CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}" # Cloudflare DNS API token
+    labels: # Traefik-specific labels for routing and SSL
+      - "traefik.enable=true" # Enable Traefik for this container
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)" # Router rule to match the host
+      - "traefik.http.routers.traefik.entrypoints=websecure" # Use the websecure entrypoint
+      - "traefik.http.routers.traefik.tls=true" # Enable TLS
+      - "traefik.http.routers.traefik.tls.certresolver=myresolver" # Use the defined certificate resolver
+      - "traefik.http.routers.traefik.tls.domains[0].main=${DOMAIN}" # Define the main domain for TLS
+      - "traefik.http.routers.traefik.tls.domains[0].sans=*.${DOMAIN}" # Define a wildcard subdomain for TLS
+      - "traefik.http.routers.traefik.middlewares=rateLimitMiddleware@file,authentik-forward-auth@file" # Apply rate limiting and forward authentication middlewares
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"  # Create a middleware named 'redirect-to-https' for HTTP to HTTPS redirection
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"  # Set the redirect as permanent (HTTP 301)
+      - "traefik.http.routers.traefik.service=api@internal" # Use the internal Traefik API service
+      - "com.centurylinklabs.watchtower.enable=false" # Disable Watchtower updates for Traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Allows Traefik to interact with Docker.
+      - ${CONFIG_PATH}/traefik/acme.json:/acme.json # Stores Let's Encrypt certificates.
+      - ${CONFIG_PATH}/traefik/dynamic:/etc/traefik/dynamic # Mount the dynamic config directory
+    networks: # Connect the container to the specified network
+      my-network: # The custom network
+      home-macvlan:
+        ipv4_address: ${NET_IP4_TRAEFIK}
+      media-net: # Connect to the media/control-plane network
+    restart: unless-stopped # Ensures service restarts if it crashes.
+  authelia: # Authelia: Single Sign-On (SSO) solution for protecting web applications.
+    container_name: authelia
+    # Integrates with reverse proxies to secure access with Two-Factor Authentication (2FA) and Single Sign-On.
+    image: authelia/authelia:4.39.15
+    volumes:
+      - ${CONFIG_PATH}/authelia:/config # Store configuration files and user data.
+    environment:
+      - AUTHELIA_JWT_SECRET=${AUTHELIA_JWT_SECRET} # JWT secret used for stateless sessions. This should be a long, randomly generated string
+      - AUTHELIA_SESSION_SECRET=${AUTHELIA_SESSION_SECRET} # Session secret used by Authelia for server-side stored sessions. This should also be a long, randomly generated string
+      # - AUTHELIA_NOTIFIER_SMTP_PASSWORD=${AUTHELIA_NOTIFIER_SMTP_PASSWORD} # Password for the SMTP server used to send verification emails (assuming you're using SMTP)
+      # Add other necessary environment variables based on your Authelia configuration
+    labels:
+      - "traefik.enable=true" # Enable Traefik for this container, it makes the Authelia service discoverable by Traefik
+      - "traefik.http.routers.authelia.rule=Host(`auth.${DOMAIN}`)" # Router rule that matches the domain name of the Authelia service
+      - "traefik.http.routers.authelia.entrypoints=websecure" # Defines the entrypoint for this router, it should be the HTTPS entrypoint
+      - "traefik.http.routers.authelia.tls.certresolver=myresolver" # This tells Traefik to use the previously defined certificate resolver for this service
+      - "traefik.http.routers.authelia.middlewares=rateLimitMiddleware@file" # Apply rate limiting middleware from the file provider
+      - "traefik.http.services.authelia.loadbalancer.server.port=9091" # Authelia's internal port that needs to be exposed to the network
+      - "com.centurylinklabs.watchtower.enable=false" # Disable Watchtower updates for Authelia
+    networks:
+      - my-network # The custom network, Authelia needs to be on the same network as Traefik for routing to work
+    restart: unless-stopped # Ensures service restarts if it crashes.
+  authentik-postgresql:
+    container_name: authentik-postgresql
+    environment:
+      POSTGRES_DB: ${PG_DB:-authentik}
+      POSTGRES_PASSWORD: ${PG_PASS:?database password required}
+      POSTGRES_USER: ${PG_USER:-authentik}
+    healthcheck:
+      interval: 30s
+      retries: 5
+      start_period: 20s
+      test:
+      - CMD-SHELL
+      - pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      timeout: 5s
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+    - ${CONFIG_PATH}/authentik/database:/var/lib/postgresql/data
+    networks:
+      - my-network
+  authentik-server:
+    container_name: authentik-server
+    command: server
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2025.10.3}
+    labels:  # Traefik magic (replaces ports:)
+      traefik.enable: "true"
+      traefik.http.routers.authentik.rule: "Host(`${AUTHENTIK_SUBDOMAIN}.${DOMAIN}`)"
+      traefik.http.routers.authentik.entrypoints: "websecure"
+      traefik.http.routers.authentik.tls.certresolver: "myresolver"
+      traefik.http.routers.authentik.service: "authentik-svc"
+      traefik.http.routers.authentik.middlewares: "rateLimitMiddleware@file"  # Your pattern
+      traefik.http.services.authentik-svc.loadbalancer.server.port: "9000"
+      traefik.http.services.authentik-svc.loadbalancer.server.scheme: "http"
+      com.centurylinklabs.watchtower.enable: "false"  # Match your style
+    restart: unless-stopped
+    volumes:
+    - ${CONFIG_PATH}/authentik/media:/media
+    - ${CONFIG_PATH}/authentik/custom-templates:/templates
+    networks:
+      - my-network
+  authentik-worker:
+    container_name: authentik-worker
+    command: worker
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2025.10.3}
+    restart: unless-stopped
+    user: root
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ${CONFIG_PATH}/authentik/media:/media
+    - ${CONFIG_PATH}/authentik/certs:/certs
+    - ${CONFIG_PATH}/authentik/custom-templates:/templates
+    networks:
+      - my-network
+
 
 networks:
   home-macvlan: # Define the MACVLAN network for direct host network access
